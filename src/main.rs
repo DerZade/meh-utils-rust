@@ -13,7 +13,7 @@ fn main() {
     }
 }
 
-fn execute(input: &[String]) -> Result<(), &'static str> {
+fn execute(input: &[String]) -> Result<(), Box<dyn std::error::Error>> {
 
     let mut app = app_from_crate!()
         .global_setting(AppSettings::PropagateVersion)
