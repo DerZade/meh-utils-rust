@@ -1,0 +1,11 @@
+[package]
+name = "meh-utils"
+description = "Utils to convert data exported with grad_meh to formats, which can be served to the browser."
+version = "0.1.0"
+authors = ["Gruppe Adler <kontakt@gruppe-adler.de>"]
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+clap = { version = "3.0.0-rc.8", features = ["cargo"] }
