@@ -1,15 +1,13 @@
 use clap::{arg, App};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
-use crate::commands::{ Command };
+use crate::commands::Command;
 
-use std::{path::Path};
-use image::{io::Reader as ImageReader, DynamicImage, codecs::png::PngEncoder};
+use image::io::Reader as ImageReader;
+use std::path::Path;
 
-use std::io::{Error, ErrorKind, BufWriter};
-use std::fs::File;
-use image::GenericImageView;
-use std::time::{Instant};
+use std::io::{Error, ErrorKind};
+use std::time::Instant;
 
 pub struct Preview {}
 
@@ -21,7 +19,6 @@ impl Command for Preview {
             .arg(arg!(-o --output <OUTPUT_DIR> "Path to output directory"))
     }
     fn run(&self, args: &clap::ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
-
         let start = Instant::now();
 
         let input_path_str = args.value_of("input").unwrap();
@@ -31,26 +28,35 @@ impl Command for Preview {
         let output_path = Path::new(output_path_str);
 
         if !output_path.is_dir() {
-            return Err(Box::new(Error::new(ErrorKind::Other, "Output path is not a directory")))
+            return Err(Box::new(Error::new(
+                ErrorKind::Other,
+                "Output path is not a directory",
+            )));
         }
 
         let preview_path = input_path.join("preview.png");
         if !preview_path.is_file() {
-            return Err(Box::new(Error::new(ErrorKind::NotFound, "Couldn't find preview.png")))
+            return Err(Box::new(Error::new(
+                ErrorKind::NotFound,
+                "Couldn't find preview.png",
+            )));
         }
 
         let now = Instant::now();
-    	println!("▶️  Loading preview image");
+        println!("▶️  Loading preview image");
         let img = ImageReader::open(preview_path)?.decode()?;
         println!("✔️  Loaded preview image in {}ms", now.elapsed().as_millis());
 
         let now = Instant::now();
-    	println!("▶️  Writing original preview image to output");
+        println!("▶️  Writing original preview image to output");
         if let Err(e) = encode_png(&output_path.join("preview.png"), &img) {
             println!("❌  Failed to write original preview image");
             println!("{}", e);
         } else {
-            println!("✔️  Wrote original preview image in {}ms", now.elapsed().as_millis());
+            println!(
+                "✔️  Wrote original preview image in {}ms",
+                now.elapsed().as_millis()
+            );
         }
 
         [128u32, 256, 512, 1024].par_iter().for_each(|size| {
@@ -58,10 +64,10 @@ impl Command for Preview {
             println!("▶️  Building x{} image", size);
 
             let thumb = img.thumbnail(*size, *size);
-            let thumb_path = output_path.join(format!("preview_{}.png",size));
+            let thumb_path = output_path.join(format!("preview_{}.png", size));
 
             if let Err(e) = encode_png(&thumb_path, &thumb) {
-		        println!("❌  Build of x{} failed", size);
+                println!("❌  Build of x{} failed", size);
                 println!("{}", e);
             } else {
                 println!("✔️  Built x{} in {}ms", size, now.elapsed().as_millis())
@@ -69,7 +75,6 @@ impl Command for Preview {
         });
 
         println!("\n    🎉  Finished in {}ms", start.elapsed().as_millis());
-
 
         Ok(())
     }

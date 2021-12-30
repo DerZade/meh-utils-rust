@@ -1,25 +1,23 @@
-use std::{collections::HashMap};
 use clap::{app_from_crate, AppSettings};
+use std::collections::HashMap;
 
 mod commands;
 
 fn main() {
     let args: Vec<_> = std::env::args().collect();
 
-
     if let Err(e) = execute(&args) {
-        println!("{}", e);
+        println!("❌ Error: {}", e);
         std::process::exit(1);
     }
 }
 
 fn execute(input: &[String]) -> Result<(), Box<dyn std::error::Error>> {
-
     let mut app = app_from_crate!()
         .global_setting(AppSettings::PropagateVersion)
         .global_setting(AppSettings::UseLongFormatForHelpSubcommand)
         .setting(AppSettings::SubcommandRequiredElseHelp);
-   
+
     let mut commands_by_name: HashMap<String, &Box<dyn commands::Command>> = HashMap::new();
     let mut commands: Vec<Box<dyn commands::Command>> = Vec::new();
 
@@ -36,10 +34,8 @@ fn execute(input: &[String]) -> Result<(), Box<dyn std::error::Error>> {
 
     let result = match matches.subcommand() {
         Some((name, sub_matches)) => match commands_by_name.get(name) {
-            Some(command) => {
-                command.run(sub_matches)
-            }
-            _ => unreachable!()
+            Some(command) => command.run(sub_matches),
+            _ => unreachable!(),
         },
         _ => unreachable!(),
     };
