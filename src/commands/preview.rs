@@ -2,6 +2,7 @@ use clap::{arg, App};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::commands::Command;
+use crate::utils::encode_png;
 
 use image::io::Reader as ImageReader;
 use std::path::Path;
@@ -77,17 +78,5 @@ impl Command for Preview {
         println!("\n    🎉  Finished in {}ms", start.elapsed().as_millis());
 
         Ok(())
-    }
-}
-
-fn encode_png(file_path: &Path, img: &DynamicImage) -> Result<(), Box<dyn std::error::Error>> {
-    let file = File::create(file_path).unwrap();
-    let ref mut buf = BufWriter::new(file);
-    let encoder = PngEncoder::new(buf);
-
-    let dim = img.dimensions();
-    match encoder.encode(&img.to_bytes(), dim.0, dim.1, img.color()) {
-      Ok(_) => Ok(()),
-      Err(err) => Err(Box::new(Error::new(ErrorKind::Other, err.to_string())))
     }
 }

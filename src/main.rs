@@ -2,6 +2,9 @@ use clap::{app_from_crate, AppSettings};
 use std::collections::HashMap;
 
 mod commands;
+mod metajson;
+mod tilejson;
+mod utils;
 
 fn main() {
     let args: Vec<_> = std::env::args().collect();
@@ -23,6 +26,7 @@ fn execute(input: &[String]) -> Result<(), Box<dyn std::error::Error>> {
 
     // Add commands here
     commands.push(Box::new(commands::Preview {}));
+    commands.push(Box::new(commands::Sat {}));
 
     for command in commands.iter() {
         let sub = command.register();
