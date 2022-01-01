@@ -1,6 +1,7 @@
 use std::{
     fs::create_dir_all,
     io::{Error, ErrorKind},
+    panic,
     path::Path,
 };
 
@@ -30,59 +31,45 @@ pub fn build_tile_set(
     let width_remainder = width % tiles_per_row_col;
     let height_remainder = height % tiles_per_row_col;
 
-    let results: Vec<_> = (0..tiles_per_row_col * tiles_per_row_col)
-        .into_par_iter()
-        .map(|index| -> Result<(), TileError> {
-            let col = index / tiles_per_row_col;
-            let row = index % tiles_per_row_col;
+    let result = panic::catch_unwind(|| {
+        (0..tiles_per_row_col * tiles_per_row_col)
+            .into_par_iter()
+            .panic_fuse()
+            .for_each(|index| {
+                let col = index / tiles_per_row_col;
+                let row = index % tiles_per_row_col;
 
-            let x = tile_width * col;
-            let y = tile_height * row;
-            let mut w = tile_width;
-            let mut h = tile_height;
+                let x = tile_width * col;
+                let y = tile_height * row;
+                let mut w = tile_width;
+                let mut h = tile_height;
 
-            // distribute remaining pixels over the first X rows / cols
-            if width_remainder > col + 1 {
-                w = w + 1;
-            }
-            if height_remainder > row + 1 {
-                h = h + 1;
-            }
+                // distribute remaining pixels over the first X rows / cols
+                if width_remainder > col + 1 {
+                    w = w + 1;
+                }
+                if height_remainder > row + 1 {
+                    h = h + 1;
+                }
 
-            let sub = img.view(x, y, w, h);
-            let resized = resize(&sub);
-            write_tile(set_base_path, &resized, col, row, lod)
-                .map_err(|e| TileError::new(col, row, e))
-        })
-        .collect();
+                let sub = img.view(x, y, w, h);
+                let resized = resize(&sub);
 
-    let errors: Vec<_> = results
-        .into_iter()
-        .filter(Result::is_err)
-        .map(|r| r.err().unwrap())
-        .collect();
+                match write_tile(set_base_path, &resized, col, row, lod) {
+                    Ok(_) => {}
+                    Err(e) => panic::panic_any(TileError::new(col, row, e)),
+                };
+            });
+    });
 
-    if errors.len() > 0 {
-        let mut error_string: Vec<String> = errors
-            .iter()
-            .take(10)
-            .map(|e| -> String { format!("\t{}", e) })
-            .collect();
+    match result {
+        Err(e) => {
+            let tile_error = e.downcast_ref::<TileError>().unwrap();
 
-        if errors.len() > 10 {
-            error_string.push(format!("\t... and {} more Tiles", errors.len() - 10))
-        }
-
-        return Err(Box::new(Error::new(
-            ErrorKind::Other,
-            format!(
-                "Failed to generate (multiple) tile(s):\n{}",
-                error_string.join("\n")
-            ),
-        )));
+            Err(Box::new(Error::new(ErrorKind::Other, format!("{}", tile_error))))
+        },
+        _ => Ok(()),
     }
-
-    Ok(())
 }
 
 fn resize<I: GenericImageView<Pixel = Rgba<u8>>>(image: &I) -> DynamicImage {
