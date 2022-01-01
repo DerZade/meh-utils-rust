@@ -38,7 +38,6 @@ pub fn build_tile_set(
             .for_each(|index| {
                 let col = index / tiles_per_row_col;
                 let row = index % tiles_per_row_col;
-
                 let x = tile_width * col;
                 let y = tile_height * row;
                 let mut w = tile_width;
@@ -62,14 +61,10 @@ pub fn build_tile_set(
             });
     });
 
-    match result {
-        Err(e) => {
-            let tile_error = e.downcast_ref::<TileError>().unwrap();
-
-            Err(Box::new(Error::new(ErrorKind::Other, format!("{}", tile_error))))
-        },
-        _ => Ok(()),
-    }
+    result.map_err::<Box<dyn std::error::Error>, _>(|e| {
+        let tile_error = e.downcast_ref::<TileError>().unwrap();
+        Box::new(Error::new(ErrorKind::Other, format!("{}", tile_error)))
+    })
 }
 
 fn resize<I: GenericImageView<Pixel = Rgba<u8>>>(image: &I) -> DynamicImage {
