@@ -6,7 +6,7 @@ pub use sat::Sat;
 
 pub trait Command {
     fn register(&self) -> clap::App<'static>;
-    fn run(&self, _args: &clap::ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
+    fn run(&self, _args: &clap::ArgMatches) -> anyhow::Result<()> {
         unimplemented!();
     }
 }

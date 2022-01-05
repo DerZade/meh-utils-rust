@@ -15,7 +15,7 @@ fn main() {
     }
 }
 
-fn execute(input: &[String]) -> Result<(), Box<dyn std::error::Error>> {
+fn execute(input: &[String]) -> anyhow::Result<()> {
     let mut app = app_from_crate!()
         .global_setting(AppSettings::PropagateVersion)
         .global_setting(AppSettings::UseLongFormatForHelpSubcommand)

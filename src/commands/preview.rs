@@ -1,3 +1,4 @@
+use anyhow::bail;
 use clap::{arg, App};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
@@ -7,7 +8,6 @@ use crate::utils::encode_png;
 use image::io::Reader as ImageReader;
 use std::path::Path;
 
-use std::io::{Error, ErrorKind};
 use std::time::Instant;
 
 pub struct Preview {}
@@ -19,7 +19,7 @@ impl Command for Preview {
             .arg(arg!(-i --input <INPUT_DIR> "Path to grad_meh map directory"))
             .arg(arg!(-o --output <OUTPUT_DIR> "Path to output directory"))
     }
-    fn run(&self, args: &clap::ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
+    fn run(&self, args: &clap::ArgMatches) -> anyhow::Result<()> {
         let start = Instant::now();
 
         let input_path_str = args.value_of("input").unwrap();
@@ -29,18 +29,12 @@ impl Command for Preview {
         let output_path = Path::new(output_path_str);
 
         if !output_path.is_dir() {
-            return Err(Box::new(Error::new(
-                ErrorKind::Other,
-                "Output path is not a directory",
-            )));
+            bail!("Output path is not a directory");
         }
 
         let preview_path = input_path.join("preview.png");
         if !preview_path.is_file() {
-            return Err(Box::new(Error::new(
-                ErrorKind::NotFound,
-                "Couldn't find preview.png",
-            )));
+            bail!("Couldn't find preview.png");
         }
 
         let now = Instant::now();

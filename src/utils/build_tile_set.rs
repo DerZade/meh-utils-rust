@@ -1,27 +1,21 @@
-use std::{
-    fs::create_dir_all,
-    io::{Error, ErrorKind},
-    panic,
-    path::Path,
-};
+use std::{fs::create_dir_all, panic, path::Path};
 
 use image::{imageops, DynamicImage, GenericImageView, Rgba};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 use super::{encode_png, TileError, TILE_SIZE_IN_PX};
 
-pub fn build_tile_set(
-    set_base_path: &Path,
-    img: &DynamicImage,
-    lod: u8,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub fn build_tile_set(set_base_path: &Path, img: &DynamicImage, lod: u8) -> anyhow::Result<()> {
     let tiles_per_row_col = 2u32.pow(lod as u32);
 
     // generate all column directories
-    (0..tiles_per_row_col).into_par_iter().for_each(|col| {
-        let file_path = set_base_path.join(lod.to_string()).join(col.to_string());
-        create_dir_all(file_path).unwrap();
-    });
+    (0..tiles_per_row_col)
+        .into_par_iter()
+        .panic_fuse()
+        .for_each(|col| {
+            let file_path = set_base_path.join(lod.to_string()).join(col.to_string());
+            create_dir_all(file_path).unwrap();
+        });
 
     let (width, height) = img.dimensions();
 
@@ -61,9 +55,9 @@ pub fn build_tile_set(
             });
     });
 
-    result.map_err::<Box<dyn std::error::Error>, _>(|e| {
+    result.map_err::<anyhow::Error, _>(|e| {
         let tile_error = e.downcast_ref::<TileError>().unwrap();
-        Box::new(Error::new(ErrorKind::Other, format!("{}", tile_error)))
+        anyhow::anyhow!("{}", tile_error)
     })
 }
 

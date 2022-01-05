@@ -1,7 +1,7 @@
+use anyhow::bail;
 use clap::{arg, App};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
-use std::io::{Error, ErrorKind};
 use std::path::Path;
 use std::time::Instant;
 
@@ -19,7 +19,7 @@ impl Command for Sat {
             .arg(arg!(-i --input <INPUT_DIR> "Path to grad_meh map directory"))
             .arg(arg!(-o --output <OUTPUT_DIR> "Path to output directory"))
     }
-    fn run(&self, args: &clap::ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
+    fn run(&self, args: &clap::ArgMatches) -> anyhow::Result<()> {
         let start = Instant::now();
 
         let input_path_str = args.value_of("input").unwrap();
@@ -29,10 +29,7 @@ impl Command for Sat {
         let output_path = Path::new(output_path_str);
 
         if !output_path.is_dir() {
-            return Err(Box::new(Error::new(
-                ErrorKind::Other,
-                "Output path is not a directory",
-            )));
+            bail!("Output path is not a directory");
         }
 
         println!("▶️  Loading meta.json");
@@ -78,7 +75,7 @@ impl Command for Sat {
     }
 }
 
-fn load_combined_sat_image(input_path: &Path) -> Result<DynamicImage, Box<dyn std::error::Error>> {
+fn load_combined_sat_image(input_path: &Path) -> anyhow::Result<DynamicImage> {
     let sat_path = input_path.join("sat");
 
     let now = Instant::now();
@@ -106,13 +103,10 @@ fn load_combined_sat_image(input_path: &Path) -> Result<DynamicImage, Box<dyn st
             .map(|r| format!("\t{}", r.err().unwrap()))
             .collect();
 
-        return Err(Box::new(Error::new(
-            ErrorKind::Other,
-            format!(
-                "Failed to load (multiple) tile(s):\n{}",
-                error_string.join("\n")
-            ),
-        )));
+        bail!(
+            "Failed to load (multiple) tile(s):\n{}",
+            error_string.join("\n")
+        );
     }
 
     let images: Vec<DynamicImage> = ok_results.into_iter().map(|r| r.unwrap()).collect();
