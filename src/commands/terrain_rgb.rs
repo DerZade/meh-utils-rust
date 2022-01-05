@@ -3,16 +3,12 @@ use clap::{arg, App};
 use image::{DynamicImage, Rgb, RgbImage};
 
 use crate::commands::Command;
-use crate::dem::{DEMParser, DEMRaster};
+use crate::dem::{load_dem, DEMRaster};
 use crate::utils::{build_tile_set, calc_max_lod};
 
-use std::fs::File;
 use std::path::Path;
 
-use std::io::{BufReader, Read};
 use std::time::Instant;
-
-use flate2::bufread::GzDecoder;
 
 pub struct TerrainRGB {}
 
@@ -77,22 +73,6 @@ impl Command for TerrainRGB {
 
         Ok(())
     }
-}
-
-fn load_dem(path: &Path) -> anyhow::Result<DEMRaster> {
-    let file = File::open(path)?;
-
-    let buf = BufReader::new(file);
-    let mut dec = GzDecoder::new(buf);
-    let mut s = String::new();
-
-    dec.read_to_string(&mut s)?;
-
-    let slice = &s[..];
-
-    let raster = DEMParser::parse(slice)?;
-
-    Ok(raster)
 }
 
 fn calculate_image(elevation_offset: f32, dem: &DEMRaster) -> anyhow::Result<DynamicImage> {
