@@ -2,6 +2,7 @@ use clap::{app_from_crate, AppSettings};
 use std::collections::HashMap;
 
 mod commands;
+mod dem;
 mod metajson;
 mod tilejson;
 mod utils;
@@ -27,6 +28,7 @@ fn execute(input: &[String]) -> anyhow::Result<()> {
     // Add commands here
     commands.push(Box::new(commands::Preview {}));
     commands.push(Box::new(commands::Sat {}));
+    commands.push(Box::new(commands::TerrainRGB {}));
 
     for command in commands.iter() {
         let sub = command.register();
