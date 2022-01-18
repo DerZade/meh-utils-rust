@@ -12,30 +12,47 @@ use std::time::Instant;
 
 pub struct Preview {}
 
+#[cfg(test)]
 mod tests {
-    use std::path::Path;
+    use std::fs::{File};
+    use std::io::Write;
+    use std::path::{Path, PathBuf};
     use crate::Command;
     use crate::commands::Preview;
+    use tempdir::TempDir;
+
+    fn create_temp_dirs() -> (PathBuf, PathBuf) {
+        let input_path = TempDir::new("meh-utils-rust-in").unwrap().into_path();
+        let output_path = TempDir::new("meh-utils-rust-out").unwrap().into_path();
+
+        (input_path, output_path)
+    }
 
     #[test]
-    fn register_returns_app() {
+    fn register_returns_named_app() {
         assert_eq!("preview", (Preview {}).register().get_name());
     }
 
     #[test]
     fn exec_bails_if_input_or_output_dirs_do_not_exist() {
-        assert!((Preview {}).exec(&Path::new("./resources/test/happy/input"), &Path::new("yolo")).is_err());
-        assert!((Preview {}).exec(&Path::new("yolo"), &Path::new("./resources/test/happy/output")).is_err());
+        let (input_path, output_path) = create_temp_dirs();
+
+        assert!((Preview {}).exec(&input_path, &Path::new("yolo")).is_err());
+        assert!((Preview {}).exec(&Path::new("yolo"), &output_path).is_err());
     }
 
     #[test]
     fn exec_bails_if_input_preview_file_does_not_exist() {
-        assert!((Preview {}).exec(&Path::new("./resources/test/preview_missing/input"), &Path::new("./resources/test/happy/output")).is_err());
+        let (input_path, output_path) = create_temp_dirs();
+        assert!((Preview {}).exec(&input_path, &output_path).is_err());
     }
 
     #[test]
     fn exec_bails_if_input_preview_img_is_invalid() {
-        assert!((Preview {}).exec(&Path::new("./resources/test/preview_invalid/input"), &Path::new("./resources/test/happy/output")).is_err());
+        let (input_path, output_path) = create_temp_dirs();
+        let mut preview_png = File::create(input_path.join(Path::new("preview.png"))).unwrap();
+        assert!(preview_png.write("foo".as_bytes()).is_ok());
+        assert!((Preview {}).exec(&input_path, &output_path).is_err());
     }
 
     #[test]
