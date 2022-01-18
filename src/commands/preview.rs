@@ -15,6 +15,7 @@ pub struct Preview {}
 #[cfg(test)]
 #[allow(unused_must_use)]
 mod tests {
+    use std::fs;
     use std::fs::{DirBuilder, File};
     use std::io::Write;
     use std::path::{Path, PathBuf};
@@ -67,7 +68,39 @@ mod tests {
 
     #[test]
     fn exec_runs_if_prerequisites_are_met() {
-        assert!((Preview {}).exec(&Path::new("./resources/test/happy/input"), &Path::new("./resources/test/happy/output")).is_ok());
+        with_input_and_output_paths(|input_path, output_path| {
+            assert!(fs::copy(Path::new("./resources/test/happy/input/preview.png"), input_path.join("preview.png")).is_ok());
+
+            assert!((Preview {}).exec(&input_path, &output_path).is_ok());
+
+
+            let mut preview_files: Vec<String> = output_path
+                .read_dir()
+                .unwrap()
+                .map(|r| {r.unwrap().file_name().to_str().unwrap_or("").to_owned()})
+                .filter(|filename| { filename.starts_with("preview_") })
+                .collect();
+
+            fn to_num(e: &str) -> i32 {
+                let digits: String = e.chars().filter(|c| { c.is_digit(10) }).collect();
+                digits.parse::<i32>().unwrap()
+            }
+
+            preview_files.sort_by(|a, b| {
+                to_num(a).cmp(&to_num(b))
+            });
+
+
+            assert_eq!(4, preview_files.len());
+            assert_eq!("preview_128.png", preview_files[0]);
+            assert_eq!("preview_256.png", preview_files[1]);
+            assert_eq!("preview_512.png", preview_files[2]);
+            assert_eq!("preview_1024.png", preview_files[3]);
+
+        });
+
+
+
     }
 }
 
