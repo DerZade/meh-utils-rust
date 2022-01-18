@@ -12,6 +12,38 @@ use std::time::Instant;
 
 pub struct Preview {}
 
+mod tests {
+    use std::path::Path;
+    use crate::Command;
+    use crate::commands::Preview;
+
+    #[test]
+    fn register_returns_app() {
+        assert_eq!("preview", (Preview {}).register().get_name());
+    }
+
+    #[test]
+    fn exec_bails_if_input_or_output_dirs_do_not_exist() {
+        assert!((Preview {}).exec(&Path::new("./resources/test/happy/input"), &Path::new("yolo")).is_err());
+        assert!((Preview {}).exec(&Path::new("yolo"), &Path::new("./resources/test/happy/output")).is_err());
+    }
+
+    #[test]
+    fn exec_bails_if_input_preview_file_does_not_exist() {
+        assert!((Preview {}).exec(&Path::new("./resources/test/preview_missing/input"), &Path::new("./resources/test/happy/output")).is_err());
+    }
+
+    #[test]
+    fn exec_bails_if_input_preview_img_is_invalid() {
+        assert!((Preview {}).exec(&Path::new("./resources/test/preview_invalid/input"), &Path::new("./resources/test/happy/output")).is_err());
+    }
+
+    #[test]
+    fn exec_runs_if_prerequisites_are_met() {
+        assert!((Preview {}).exec(&Path::new("./resources/test/happy/input"), &Path::new("./resources/test/happy/output")).is_ok());
+    }
+}
+
 impl Command for Preview {
     fn register(&self) -> App<'static> {
         App::new("preview")
@@ -20,13 +52,19 @@ impl Command for Preview {
             .arg(arg!(-o --output <OUTPUT_DIR> "Path to output directory"))
     }
     fn run(&self, args: &clap::ArgMatches) -> anyhow::Result<()> {
-        let start = Instant::now();
 
         let input_path_str = args.value_of("input").unwrap();
         let output_path_str = args.value_of("output").unwrap();
 
         let input_path = Path::new(input_path_str);
         let output_path = Path::new(output_path_str);
+
+        self.exec(input_path, output_path)
+    }
+}
+impl Preview {
+    fn exec(&self, input_path: &Path, output_path: &Path) -> anyhow::Result<()> {
+        let start = Instant::now();
 
         if !output_path.is_dir() {
             bail!("Output path is not a directory");

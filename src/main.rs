@@ -24,7 +24,7 @@ fn execute(input: &[String]) -> anyhow::Result<()> {
         .setting(AppSettings::SubcommandRequiredElseHelp);
 
     let mut commands_by_name: HashMap<String, &dyn Command> = HashMap::new();
-    let mut commands: Vec<&dyn Command> = vec![
+    let commands: Vec<&dyn Command> = vec![
         &commands::Preview {},
         &commands::Sat {},
         &commands::TerrainRGB {},
