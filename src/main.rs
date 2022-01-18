@@ -1,5 +1,6 @@
 use clap::{app_from_crate, AppSettings};
 use std::collections::HashMap;
+use commands::Command;
 
 mod commands;
 mod dem;
@@ -22,17 +23,17 @@ fn execute(input: &[String]) -> anyhow::Result<()> {
         .global_setting(AppSettings::UseLongFormatForHelpSubcommand)
         .setting(AppSettings::SubcommandRequiredElseHelp);
 
-    let mut commands_by_name: HashMap<String, &Box<dyn commands::Command>> = HashMap::new();
-    let mut commands: Vec<Box<dyn commands::Command>> = Vec::new();
-
-    // Add commands here
-    commands.push(Box::new(commands::Preview {}));
-    commands.push(Box::new(commands::Sat {}));
-    commands.push(Box::new(commands::TerrainRGB {}));
+    let mut commands_by_name: HashMap<String, &dyn Command> = HashMap::new();
+    let commands: Vec<&dyn Command> = vec![
+        &commands::Preview {},
+        &commands::Sat {},
+        &commands::TerrainRGB {},
+        // Add commands here
+    ];
 
     for command in commands.iter() {
         let sub = command.register();
-        commands_by_name.insert(sub.get_name().to_owned(), command);
+        commands_by_name.insert(sub.get_name().to_owned(), *command);
         app = app.subcommand(sub);
     }
 
