@@ -90,17 +90,12 @@ mod tests {
                 to_num(a).cmp(&to_num(b))
             });
 
-
             assert_eq!(4, preview_files.len());
             assert_eq!("preview_128.png", preview_files[0]);
             assert_eq!("preview_256.png", preview_files[1]);
             assert_eq!("preview_512.png", preview_files[2]);
             assert_eq!("preview_1024.png", preview_files[3]);
-
         });
-
-
-
     }
 }
 
