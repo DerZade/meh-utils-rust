@@ -7,6 +7,8 @@ mod dem;
 mod metajson;
 mod tilejson;
 mod utils;
+mod mvt;
+mod feature;
 
 fn main() {
     let args: Vec<_> = std::env::args().collect();
@@ -28,6 +30,7 @@ fn execute(input: &[String]) -> anyhow::Result<()> {
         &commands::Preview {},
         &commands::Sat {},
         &commands::TerrainRGB {},
+        &commands::MapboxVectorTiles {},
         // Add commands here
     ];
 

@@ -66,7 +66,7 @@ impl Command for Sat {
 
         let now = Instant::now();
         println!("▶️  Creating tile.json");
-        crate::tilejson::write(output_path, max_lod, meta, "Satellite", Vec::new())?;
+        crate::tilejson::write(output_path, max_lod, meta, "Satellite", &Vec::new())?;
         println!("✔️  Created tile.json in {}ms", now.elapsed().as_millis());
 
         println!("\n    🎉  Finished in {}ms", start.elapsed().as_millis());

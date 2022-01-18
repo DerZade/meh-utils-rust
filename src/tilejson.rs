@@ -36,7 +36,7 @@ pub fn write(
     max_lod: u8,
     meta: MetaJSON,
     type_display_name: &str,
-    vector_layer_names: Vec<String>,
+    vector_layer_names: &Vec<String>,
 ) -> Result<(), Error> {
     let vector_layers: Vec<_> = vector_layer_names
         .iter()
