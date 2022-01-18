@@ -1,5 +1,5 @@
 
-[![codecov](https://codecov.io/gh/Fusselwurm/meh-utils-rust/branch/master/graph/badge.svg)](https://codecov.io/gh/Fusselwurm/meh-utils-rust)
+[![codecov](https://codecov.io/gh/DerZade/meh-utils-rust/branch/master/graph/badge.svg)](https://codecov.io/gh/DerZade/meh-utils-rust)
 
 # meh-utils-rust
 
