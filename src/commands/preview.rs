@@ -13,19 +13,26 @@ use std::time::Instant;
 pub struct Preview {}
 
 #[cfg(test)]
+#[allow(unused_must_use)]
 mod tests {
-    use std::fs::{File};
+    use std::fs::{DirBuilder, File};
     use std::io::Write;
     use std::path::{Path, PathBuf};
     use crate::Command;
     use crate::commands::Preview;
     use tempdir::TempDir;
 
-    fn create_temp_dirs() -> (PathBuf, PathBuf) {
-        let input_path = TempDir::new("meh-utils-rust-in").unwrap().into_path();
-        let output_path = TempDir::new("meh-utils-rust-out").unwrap().into_path();
+    fn with_input_and_output_paths(f: fn(PathBuf, PathBuf) -> ()) -> std::io::Result<()> {
+        let dir = TempDir::new("meh-utils-rust-in")?;
+        let temp_dir_path = dir.path();
+        let input_path = temp_dir_path.join("input");
+        let output_path = temp_dir_path.join("output");
+        DirBuilder::new().create(&input_path)?;
+        DirBuilder::new().create(&output_path)?;
 
-        (input_path, output_path)
+        f(input_path, output_path);
+
+        dir.close()
     }
 
     #[test]
@@ -35,24 +42,27 @@ mod tests {
 
     #[test]
     fn exec_bails_if_input_or_output_dirs_do_not_exist() {
-        let (input_path, output_path) = create_temp_dirs();
 
-        assert!((Preview {}).exec(&input_path, &Path::new("yolo")).is_err());
-        assert!((Preview {}).exec(&Path::new("yolo"), &output_path).is_err());
+        with_input_and_output_paths(|input_path, output_path| {
+            assert!((Preview {}).exec(&input_path, &Path::new("yolo")).is_err());
+            assert!((Preview {}).exec(&Path::new("yolo"), &output_path).is_err());
+        });
     }
 
     #[test]
     fn exec_bails_if_input_preview_file_does_not_exist() {
-        let (input_path, output_path) = create_temp_dirs();
-        assert!((Preview {}).exec(&input_path, &output_path).is_err());
+        with_input_and_output_paths(|input_path, output_path| {
+            assert!((Preview {}).exec(&input_path, &output_path).is_err());
+        });
     }
 
     #[test]
     fn exec_bails_if_input_preview_img_is_invalid() {
-        let (input_path, output_path) = create_temp_dirs();
-        let mut preview_png = File::create(input_path.join(Path::new("preview.png"))).unwrap();
-        assert!(preview_png.write("foo".as_bytes()).is_ok());
-        assert!((Preview {}).exec(&input_path, &output_path).is_err());
+        with_input_and_output_paths(|input_path, output_path| {
+            let mut preview_png = File::create(input_path.join(Path::new("preview.png"))).unwrap();
+            assert!(preview_png.write("foo".as_bytes()).is_ok());
+            assert!((Preview {}).exec(&input_path, &output_path).is_err());
+        });
     }
 
     #[test]
