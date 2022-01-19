@@ -13,6 +13,13 @@ use std::path::Path;
 
 use std::time::Instant;
 
+#[cfg(test)]
+mod tests {
+    fn bails_on_output_dir_nonexistent() {
+
+    }
+}
+
 pub struct MapboxVectorTiles {
 }
 impl MehDataCommand for MapboxVectorTiles {

@@ -13,25 +13,12 @@ use crate::MehDataCommand;
 #[allow(unused_must_use)]
 mod tests {
     use std::fs;
-    use std::fs::{DirBuilder, File};
+    use std::fs::{File};
     use std::io::Write;
-    use std::path::{Path, PathBuf};
+    use std::path::{Path};
     use crate::{MehDataCommand};
-    use tempdir::TempDir;
     use crate::commands::preview::Preview;
-
-    fn with_input_and_output_paths(f: fn(PathBuf, PathBuf) -> ()) -> std::io::Result<()> {
-        let dir = TempDir::new("meh-utils-rust-in")?;
-        let temp_dir_path = dir.path();
-        let input_path = temp_dir_path.join("input");
-        let output_path = temp_dir_path.join("output");
-        DirBuilder::new().create(&input_path)?;
-        DirBuilder::new().create(&output_path)?;
-
-        f(input_path, output_path);
-
-        dir.close()
-    }
+    use crate::utils::with_input_and_output_paths;
 
     #[test]
     fn exec_bails_if_input_or_output_dirs_do_not_exist() {
