@@ -1,7 +1,6 @@
 use clap::{app_from_crate, AppSettings};
-use std::collections::HashMap;
 use crate::commands::{ClapCommand, MehDataCommand, Preview, Sat, TerrainRGB, MapboxVectorTiles};
-
+use crate::metajson::SerdeMetaJsonParser;
 
 
 mod commands;
@@ -22,30 +21,25 @@ fn main() {
 }
 
 fn execute(input: &[String]) -> anyhow::Result<()> {
+    let commands: Vec<ClapCommand> = vec![
+        ClapCommand::new("preview", Box::new(Preview {})),
+        ClapCommand::new("sat", Box::new(Sat {})),
+        ClapCommand::new("terrain_rgb", Box::new(TerrainRGB {})),
+        ClapCommand::new("mvt", Box::new(MapboxVectorTiles::new(Box::new(SerdeMetaJsonParser {})))),
+        // Add commands here
+    ];
+
     let mut app = app_from_crate!()
         .global_setting(AppSettings::PropagateVersion)
         .global_setting(AppSettings::UseLongFormatForHelpSubcommand)
         .setting(AppSettings::SubcommandRequiredElseHelp);
 
-    let mut commands_by_name: HashMap<String, &ClapCommand> = HashMap::new();
-    let commands: Vec<ClapCommand> = vec![
-        ClapCommand::new("preview", &Preview {}),
-        ClapCommand::new("sat", &Sat {}),
-        ClapCommand::new("terrain_rgb", &TerrainRGB {}),
-        ClapCommand::new("mvt", &MapboxVectorTiles {}),
-        // Add commands here
-    ];
-
-    for command in commands.iter() {
-        let sub = command.register();
-        commands_by_name.insert(sub.get_name().to_owned(), command);
-        app = app.subcommand(sub);
-    }
+    app = commands.iter().fold(app, |a, c| a.subcommand(c.register()));
 
     let matches = app.get_matches_from(input);
 
     let result = match matches.subcommand() {
-        Some((name, sub_matches)) => match commands_by_name.get(name) {
+        Some((name, sub_matches)) => match commands.iter().filter(|c| {c.identifier == name}).next() {
             Some(command) => command.run(sub_matches),
             _ => unreachable!(),
         },

@@ -12,7 +12,7 @@ mod tests {
     use crate::utils::with_input_and_output_paths;
 
     fn clap_command_with_params(args: Vec<String>) -> anyhow::Result<()> {
-        let cmd = ClapCommand { identifier: "foo".to_string(), exec:  &DummyMehDataCommand {} };
+        let cmd = ClapCommand::new("foo", Box::new(DummyMehDataCommand {}));
         let app = cmd.register();
 
 
@@ -59,7 +59,7 @@ mod tests {
 
     #[test]
     fn clap_command_new_builds_correctly() {
-        let cmd = ClapCommand::new("foo", &DummyMehDataCommand {});
+        let cmd = ClapCommand::new("foo", Box::new(DummyMehDataCommand {}));
         assert_eq!(cmd.identifier, "foo".to_string());
         assert_eq!(cmd.exec.get_description(), "dummy");
 
@@ -68,15 +68,15 @@ mod tests {
 
 pub struct ClapCommand {
     pub identifier: String,
-    pub exec: &'static dyn MehDataCommand,
+    pub exec: Box<dyn MehDataCommand>,
 }
 
 impl ClapCommand {
-    pub fn new(identifier: &str, exec: &'static impl MehDataCommand) -> Self {
+    pub fn new(identifier: &str, exec: Box<dyn MehDataCommand>) -> Self {
         ClapCommand { identifier: identifier.to_string(), exec }
     }
 
-    pub fn register(&self) -> App<'static> {
+    pub fn register(&self) -> App {
 
         let app = App::new(&self.identifier)
             .about(self.exec.get_description().as_ref());

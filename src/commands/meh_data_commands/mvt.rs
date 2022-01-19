@@ -12,23 +12,31 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use std::time::Instant;
+use crate::metajson::{MetaJsonParser};
 
 #[cfg(test)]
 #[allow(unused_must_use)]
 mod tests {
     use crate::commands::{MapboxVectorTiles, MehDataCommand};
+    use crate::metajson::DummyMetaJsonParser;
     use crate::utils::with_input_and_output_paths;
 
     #[test]
     fn bails_on_input_dir_empty() {
         with_input_and_output_paths(|input_path, output_path| {
-            let result = (MapboxVectorTiles {}).exec(&input_path, &output_path);
+            let result = (MapboxVectorTiles::new(Box::new(DummyMetaJsonParser { succeeds: true }))).exec(&input_path, &output_path);
             assert!(result.is_err());
         });
     }
 }
 
 pub struct MapboxVectorTiles {
+    meta_json: Box<dyn MetaJsonParser>,
+}
+impl MapboxVectorTiles {
+    pub fn new(meta_json: Box<dyn MetaJsonParser>) -> Self {
+        MapboxVectorTiles { meta_json }
+    }
 }
 impl MehDataCommand for MapboxVectorTiles {
     fn get_description(&self) -> &str {
@@ -43,7 +51,7 @@ impl MehDataCommand for MapboxVectorTiles {
 
         println!("▶️  Loading meta.json");
         let meta_path = input_path.join("meta.json");
-        let meta = crate::metajson::from_file(&meta_path)?;
+        let meta = self.meta_json.parse(&meta_path)?;
         println!("✔️  Loaded meta.json");
 
         // load DEM
