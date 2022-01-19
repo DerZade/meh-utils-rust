@@ -33,7 +33,7 @@ pub fn load_geo_jsons(input_path: &Path, collections: &mut HashMap<String, Featu
     let (mut ok_results, mut err_results): (Vec<_>, Vec<_>) = find_files_rec(input_path)?.into_par_iter().map(|entry| -> anyhow::Result<(String, FeatureCollection<f32>)> {
         let path_buf = entry.path();
         let path = path_buf.as_path();
-        let layer_name = path_to_layer_name(path, input_path).unwrap();
+        let layer_name = path_to_layer_name(path, input_path)?;
         let fc = read_zipped_geo_json(path)?;
 
         Ok((layer_name, fc))
