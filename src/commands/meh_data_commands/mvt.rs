@@ -14,6 +14,7 @@ use std::path::Path;
 use std::time::Instant;
 
 #[cfg(test)]
+#[allow(unused_must_use)]
 mod tests {
     use crate::commands::{MapboxVectorTiles, MehDataCommand};
     use crate::utils::with_input_and_output_paths;
@@ -39,9 +40,6 @@ impl MehDataCommand for MapboxVectorTiles {
 
         let start = Instant::now();
 
-        if !output_path.is_dir() {
-            bail!("Output path is not a directory");
-        }
 
         println!("▶️  Loading meta.json");
         let meta_path = input_path.join("meta.json");

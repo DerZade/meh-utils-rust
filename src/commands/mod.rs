@@ -9,3 +9,14 @@ pub trait MehDataCommand {
     fn get_description(&self) -> &str;
     fn exec(&self, input_path: &Path, output_path: &Path) -> anyhow::Result<()>;
 }
+
+pub struct DummyMehDataCommand {}
+impl MehDataCommand for DummyMehDataCommand {
+    fn get_description(&self) -> &str {
+        "dummy"
+    }
+
+    fn exec(&self, _: &Path, _: &Path) -> anyhow::Result<()> {
+        Ok(())
+    }
+}

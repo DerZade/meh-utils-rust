@@ -21,15 +21,6 @@ mod tests {
     use crate::utils::with_input_and_output_paths;
 
     #[test]
-    fn exec_bails_if_input_or_output_dirs_do_not_exist() {
-
-        with_input_and_output_paths(|input_path, output_path| {
-            assert!((Preview {}).exec(&input_path, &Path::new("yolo")).is_err());
-            assert!((Preview {}).exec(&Path::new("yolo"), &output_path).is_err());
-        });
-    }
-
-    #[test]
     fn exec_bails_if_input_preview_file_does_not_exist() {
         with_input_and_output_paths(|input_path, output_path| {
             assert!((Preview {}).exec(&input_path, &output_path).is_err());
@@ -88,10 +79,6 @@ impl MehDataCommand for Preview {
 
     fn exec(&self, input_path: &Path, output_path: &Path) -> anyhow::Result<()> {
         let start = Instant::now();
-
-        if !output_path.is_dir() {
-            bail!("Output path is not a directory");
-        }
 
         let preview_path = input_path.join("preview.png");
         if !preview_path.is_file() {
