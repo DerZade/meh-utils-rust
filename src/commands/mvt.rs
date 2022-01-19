@@ -1,39 +1,29 @@
 use anyhow::bail;
-use clap::{arg, App};
 use geo::map_coords::MapCoordsInplace;
 use geo::{CoordNum, GeoFloat};
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 
-use crate::commands::Command;
+use crate::commands::{MehDataCommand};
 use crate::dem::{DEMRaster, load_dem};
 use crate::feature::{FeatureCollection, Simplifiable};
 use crate::mvt::{load_geo_jsons, build_mounts};
 
 use std::collections::HashMap;
-use std::ops::Div;
 use std::path::Path;
 
 use std::time::Instant;
 
-pub struct MapboxVectorTiles {}
-
-impl Command for MapboxVectorTiles {
-    fn register(&self) -> App<'static> {
-        App::new("mvt")
-            .about("Build mabox vector tiles from grad_meh data.")
-            .arg(arg!(-i --input <INPUT_DIR> "Path to grad_meh map directory"))
-            .arg(arg!(-o --output <OUTPUT_DIR> "Path to output directory"))
+pub struct MapboxVectorTiles {
+}
+impl MehDataCommand for MapboxVectorTiles {
+    fn get_description(&self) -> &str {
+        "Build mapbox vector tiles from grad_meh data."
     }
-    fn run(&self, args: &clap::ArgMatches) -> anyhow::Result<()> {
+
+    fn exec(&self, input_path: &Path, output_path: &Path) -> anyhow::Result<()> {
         let mut collections: HashMap<String, FeatureCollection<f32>> = HashMap::new();
 
         let start = Instant::now();
-
-        let input_path_str = args.value_of("input").unwrap();
-        let output_path_str = args.value_of("output").unwrap();
-
-        let input_path = Path::new(input_path_str);
-        let output_path = Path::new(output_path_str);
 
         if !output_path.is_dir() {
             bail!("Output path is not a directory");

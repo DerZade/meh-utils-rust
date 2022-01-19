@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use geo::{
     algorithm::simplify::{Simplify},
-    Geometry, map_coords::MapCoordsInplace, CoordNum, GeoFloat, CoordFloat, GeometryCollection
+    Geometry, map_coords::MapCoordsInplace, CoordNum, GeoFloat, GeometryCollection
 };
 
 #[derive(Clone)]
@@ -161,9 +161,13 @@ impl<T: GeoFloat> Simplifiable<T> for FeatureCollection<T> {
 
 
     fn remove_empty(&mut self, line_limit: T, area_limit: T) -> () {
+        todo!();
+        /*
         self.0 = self.0.into_iter().filter_map(|f| {
             Some(f)
         }).collect();
+
+         */
 
         // self = self.iter_mut().filter_map(|f| {
         //     match &f.geometry {

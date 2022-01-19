@@ -1,6 +1,6 @@
 use clap::{app_from_crate, AppSettings};
 use std::collections::HashMap;
-use commands::Command;
+use crate::commands::{Preview, ClapCommand, MapboxVectorTiles, MehDataCommand, Sat, TerrainRGB};
 
 mod commands;
 mod dem;
@@ -25,18 +25,18 @@ fn execute(input: &[String]) -> anyhow::Result<()> {
         .global_setting(AppSettings::UseLongFormatForHelpSubcommand)
         .setting(AppSettings::SubcommandRequiredElseHelp);
 
-    let mut commands_by_name: HashMap<String, &dyn Command> = HashMap::new();
-    let commands: Vec<&dyn Command> = vec![
-        &commands::Preview {},
-        &commands::Sat {},
-        &commands::TerrainRGB {},
-        &commands::MapboxVectorTiles {},
+    let mut commands_by_name: HashMap<String, &ClapCommand> = HashMap::new();
+    let commands: Vec<ClapCommand> = vec![
+        ClapCommand::new("preview", &Preview {}),
+        ClapCommand::new("sat", &Sat {}),
+        ClapCommand::new("terrain_rgb", &TerrainRGB {}),
+        ClapCommand::new("mvt", &MapboxVectorTiles {}),
         // Add commands here
     ];
 
     for command in commands.iter() {
         let sub = command.register();
-        commands_by_name.insert(sub.get_name().to_owned(), *command);
+        commands_by_name.insert(sub.get_name().to_owned(), command);
         app = app.subcommand(sub);
     }
 

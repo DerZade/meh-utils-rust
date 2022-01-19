@@ -1,16 +1,13 @@
 use anyhow::bail;
-use clap::{arg, App};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
-use crate::commands::Command;
 use crate::utils::encode_png;
 
 use image::io::Reader as ImageReader;
 use std::path::Path;
 
 use std::time::Instant;
-
-pub struct Preview {}
+use crate::MehDataCommand;
 
 #[cfg(test)]
 #[allow(unused_must_use)]
@@ -19,9 +16,9 @@ mod tests {
     use std::fs::{DirBuilder, File};
     use std::io::Write;
     use std::path::{Path, PathBuf};
-    use crate::Command;
-    use crate::commands::Preview;
+    use crate::{MehDataCommand};
     use tempdir::TempDir;
+    use crate::commands::preview::Preview;
 
     fn with_input_and_output_paths(f: fn(PathBuf, PathBuf) -> ()) -> std::io::Result<()> {
         let dir = TempDir::new("meh-utils-rust-in")?;
@@ -34,11 +31,6 @@ mod tests {
         f(input_path, output_path);
 
         dir.close()
-    }
-
-    #[test]
-    fn register_returns_named_app() {
-        assert_eq!("preview", (Preview {}).register().get_name());
     }
 
     #[test]
@@ -99,25 +91,14 @@ mod tests {
     }
 }
 
-impl Command for Preview {
-    fn register(&self) -> App<'static> {
-        App::new("preview")
-            .about("Build resolutions for preview image.")
-            .arg(arg!(-i --input <INPUT_DIR> "Path to grad_meh map directory"))
-            .arg(arg!(-o --output <OUTPUT_DIR> "Path to output directory"))
+pub struct Preview {}
+
+impl MehDataCommand for Preview {
+
+    fn get_description(&self) -> &str {
+        "Build resolutions for preview image."
     }
-    fn run(&self, args: &clap::ArgMatches) -> anyhow::Result<()> {
 
-        let input_path_str = args.value_of("input").unwrap();
-        let output_path_str = args.value_of("output").unwrap();
-
-        let input_path = Path::new(input_path_str);
-        let output_path = Path::new(output_path_str);
-
-        self.exec(input_path, output_path)
-    }
-}
-impl Preview {
     fn exec(&self, input_path: &Path, output_path: &Path) -> anyhow::Result<()> {
         let start = Instant::now();
 
