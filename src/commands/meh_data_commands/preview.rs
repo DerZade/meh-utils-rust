@@ -17,7 +17,7 @@ mod tests {
     use std::io::Write;
     use std::path::{Path};
     use crate::{MehDataCommand};
-    use crate::commands::preview::Preview;
+    use crate::commands::Preview;
     use crate::utils::with_input_and_output_paths;
 
     #[test]

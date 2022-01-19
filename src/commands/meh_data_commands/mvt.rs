@@ -15,8 +15,15 @@ use std::time::Instant;
 
 #[cfg(test)]
 mod tests {
-    fn bails_on_output_dir_nonexistent() {
+    use crate::commands::{MapboxVectorTiles, MehDataCommand};
+    use crate::utils::with_input_and_output_paths;
 
+    #[test]
+    fn bails_on_input_dir_empty() {
+        with_input_and_output_paths(|input_path, output_path| {
+            let result = (MapboxVectorTiles {}).exec(&input_path, &output_path);
+            assert!(result.is_err());
+        });
     }
 }
 

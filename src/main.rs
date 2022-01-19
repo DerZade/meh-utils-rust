@@ -1,6 +1,8 @@
 use clap::{app_from_crate, AppSettings};
 use std::collections::HashMap;
-use crate::commands::{Preview, ClapCommand, MapboxVectorTiles, MehDataCommand, Sat, TerrainRGB};
+use crate::commands::{ClapCommand, MehDataCommand, Preview, Sat, TerrainRGB, MapboxVectorTiles};
+
+
 
 mod commands;
 mod dem;
