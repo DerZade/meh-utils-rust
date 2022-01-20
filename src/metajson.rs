@@ -116,7 +116,7 @@ mod tests {
         assert!(res.is_ok());
         let meta = res.unwrap();
         assert_eq!("Bohemia Interactive", meta.author);
-        assert_eq!(8192, meta.world_size);
+        assert_eq!(2048, meta.world_size);
     }
 
     #[test]

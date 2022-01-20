@@ -61,7 +61,7 @@ impl MehDataCommand for MapboxVectorTiles {
         if !dem_path.is_file() {
             bail!("Couldn't find dem.asc.gz");
         }
-        let dem = load_dem(&dem_path)?;
+        let dem: DEMRaster = load_dem(&dem_path)?;
         println!("✔️  Loaded DEM in {}ms", now.elapsed().as_millis());
 
         // contour lines

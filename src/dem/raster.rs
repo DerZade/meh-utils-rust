@@ -4,6 +4,8 @@ pub enum Origin {
     Corner(f32, f32),
 }
 
+
+/// DEM is short for Digital Elevation Model.
 #[derive(Debug)]
 pub struct DEMRaster {
     columns: usize,
@@ -11,7 +13,9 @@ pub struct DEMRaster {
     left: f32,
     bottom: f32,
     cell_size: f32,
+    /// the magic value used for "unknown value in this cell"
     no_data_value: f32,
+    /// ordered list of elevation raster values, to be folded into `columns` and `rows`
     data: Vec<f32>,
 }
 

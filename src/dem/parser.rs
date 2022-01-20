@@ -312,3 +312,32 @@ impl DEMParser {
         ))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::dem::DEMParser;
+
+    #[test]
+    fn parser_parses() {
+        let res = DEMParser::parse("ncols 3
+nrows 4
+xllcorner 0
+yllcorner -4
+cellsize 4
+NODATA_value -9999
+1.0 2.0 3.0
+2.0 3.0 4.0
+3.0 4.0 5.0
+4.0 5.0 6.0
+");
+        assert!(res.is_ok());
+        let dem_raster = res.unwrap();
+        assert_eq!(dem_raster.z(0, 0), 1.0);
+        assert_eq!(dem_raster.z(0, 3), 4.0);
+        assert_eq!(dem_raster.z(2, 3), 6.0);
+        assert_eq!(dem_raster.dimensions(), (3, 4));
+
+        assert_eq!(dem_raster.x(0), 0.0);
+        assert_eq!(dem_raster.y(0), 12.0);
+    }
+}
