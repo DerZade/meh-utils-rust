@@ -3,7 +3,6 @@ use geo::map_coords::MapCoordsInplace;
 use geo::{CoordNum, GeoFloat};
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 
-use crate::commands::{MehDataCommand};
 use crate::dem::{DEMRaster, load_dem};
 use crate::feature::{FeatureCollection, Simplifiable};
 use crate::mvt::{load_geo_jsons, build_mounts};
@@ -17,7 +16,7 @@ use crate::metajson::{MetaJsonParser};
 #[cfg(test)]
 #[allow(unused_must_use)]
 mod tests {
-    use crate::commands::{MapboxVectorTiles, MehDataCommand};
+    use crate::commands::mvt::MapboxVectorTiles;
     use crate::metajson::DummyMetaJsonParser;
     use crate::utils::with_input_and_output_paths;
 
@@ -37,17 +36,11 @@ impl MapboxVectorTiles {
     pub fn new(meta_json: Box<dyn MetaJsonParser>) -> Self {
         MapboxVectorTiles { meta_json }
     }
-}
-impl MehDataCommand for MapboxVectorTiles {
-    fn get_description(&self) -> &str {
-        "Build mapbox vector tiles from grad_meh data."
-    }
 
-    fn exec(&self, input_path: &Path, output_path: &Path) -> anyhow::Result<()> {
+    pub fn exec(&self, input_path: &Path, output_path: &Path) -> anyhow::Result<()> {
         let mut collections: HashMap<String, FeatureCollection<f32>> = HashMap::new();
 
         let start = Instant::now();
-
 
         println!("▶️  Loading meta.json");
         let meta_path = input_path.join("meta.json");

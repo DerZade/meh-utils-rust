@@ -1,5 +1,5 @@
-use clap::{app_from_crate, AppSettings};
-use crate::commands::{ClapCommand, MehDataCommand, Preview, Sat, TerrainRGB, MapboxVectorTiles};
+use clap::{App, app_from_crate, AppSettings};
+use crate::commands::{ClapCommand, PreviewCommand, SatCommand, MvtCommand, TerrainRgbCommand};
 use crate::metajson::SerdeMetaJsonParser;
 
 
@@ -21,11 +21,11 @@ fn main() {
 }
 
 fn execute(input: &[String]) -> anyhow::Result<()> {
-    let commands: Vec<ClapCommand> = vec![
-        ClapCommand::new("preview", Box::new(Preview {})),
-        ClapCommand::new("sat", Box::new(Sat {})),
-        ClapCommand::new("terrain_rgb", Box::new(TerrainRGB {})),
-        ClapCommand::new("mvt", Box::new(MapboxVectorTiles::new(Box::new(SerdeMetaJsonParser {})))),
+    let commands: Vec<&dyn ClapCommand> = vec![
+        &PreviewCommand {},
+        &SatCommand {},
+        &TerrainRgbCommand {},
+        &MvtCommand {},
         // Add commands here
     ];
 
@@ -34,13 +34,15 @@ fn execute(input: &[String]) -> anyhow::Result<()> {
         .global_setting(AppSettings::UseLongFormatForHelpSubcommand)
         .setting(AppSettings::SubcommandRequiredElseHelp);
 
-    app = commands.iter().fold(app, |a, c| a.subcommand(c.register()));
+    app = commands.iter().fold(app, |main_app: App, subcommand| {
+        main_app.subcommand(subcommand.register())
+    });
 
     let matches = app.get_matches_from(input);
 
     let result = match matches.subcommand() {
-        Some((name, sub_matches)) => match commands.iter().filter(|c| {c.identifier == name}).next() {
-            Some(command) => command.run(sub_matches),
+        Some((name, sub_matches)) => match commands.iter().filter(|c| {c.get_identifier() == name}).next() {
+            Some(command) => command.exec(sub_matches),
             _ => unreachable!(),
         },
         _ => unreachable!(),

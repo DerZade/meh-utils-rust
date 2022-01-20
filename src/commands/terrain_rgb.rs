@@ -7,17 +7,11 @@ use crate::utils::{build_tile_set, calc_max_lod};
 use std::path::Path;
 
 use std::time::Instant;
-use crate::MehDataCommand;
 
 pub struct TerrainRGB {}
 
-impl MehDataCommand for TerrainRGB {
-
-    fn get_description(&self) -> &str {
-        "Build Terrain-RGB tiles from grad_meh data."
-    }
-
-    fn exec(&self, input_path: &Path, output_path: &Path) -> anyhow::Result<()> {
+impl TerrainRGB {
+    pub fn exec(&self, input_path: &Path, output_path: &Path) -> anyhow::Result<()> {
         let start = Instant::now();
         if !output_path.is_dir() {
             bail!("Output path is not a directory");

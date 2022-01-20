@@ -7,7 +7,6 @@ use image::io::Reader as ImageReader;
 use std::path::Path;
 
 use std::time::Instant;
-use crate::MehDataCommand;
 
 #[cfg(test)]
 #[allow(unused_must_use)]
@@ -16,8 +15,7 @@ mod tests {
     use std::fs::{File};
     use std::io::Write;
     use std::path::{Path};
-    use crate::{MehDataCommand};
-    use crate::commands::Preview;
+    use crate::commands::preview::Preview;
     use crate::utils::with_input_and_output_paths;
 
     #[test]
@@ -70,14 +68,8 @@ mod tests {
 }
 
 pub struct Preview {}
-
-impl MehDataCommand for Preview {
-
-    fn get_description(&self) -> &str {
-        "Build resolutions for preview image."
-    }
-
-    fn exec(&self, input_path: &Path, output_path: &Path) -> anyhow::Result<()> {
+impl Preview {
+    pub fn exec(&self, input_path: &Path, output_path: &Path) -> anyhow::Result<()> {
         let start = Instant::now();
 
         let preview_path = input_path.join("preview.png");

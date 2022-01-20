@@ -6,22 +6,12 @@ use std::time::Instant;
 
 use image::{imageops::replace, io::Reader as ImageReader, DynamicImage, GenericImageView};
 
-use crate::MehDataCommand;
 use crate::utils::{build_tile_set, calc_max_lod, TileError};
 
 pub struct Sat {}
-
-impl MehDataCommand for Sat {
-
-    fn get_description(&self) -> &str {
-        "Build satellite tiles from grad_meh data."
-    }
-
-    fn exec(&self, input_path: &Path, output_path: &Path) -> anyhow::Result<()> {
+impl Sat {
+    pub fn exec(&self, input_path: &Path, output_path: &Path) -> anyhow::Result<()> {
         let start = Instant::now();
-        if !output_path.is_dir() {
-            bail!("Output path is not a directory");
-        }
 
         println!("▶️  Loading meta.json");
         let meta_path = input_path.join("meta.json");
