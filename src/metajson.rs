@@ -100,3 +100,30 @@ pub fn from_file(path: &Path) -> Result<MetaJSON, Box<Error>> {
         Err(err) => Err(Box::new(Error::new(ErrorKind::Other, err.to_string()))),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::io::ErrorKind;
+    use std::path::Path;
+    use crate::metajson::MetaJsonParser;
+    use crate::SerdeMetaJsonParser;
+
+    #[test]
+    fn reads_file_and_deserializes() {
+        let parser = SerdeMetaJsonParser {};
+        let res = parser.parse(Path::new("./resources/test/happy/input/meta.json"));
+
+        assert!(res.is_ok());
+        let meta = res.unwrap();
+        assert_eq!("Bohemia Interactive", meta.author);
+        assert_eq!(8192, meta.world_size);
+    }
+
+    #[test]
+    fn errors_out_with_not_found_on_file_not_found() {
+        let parser = SerdeMetaJsonParser {};
+        let res = parser.parse(Path::new("./resources/test/happy/input/meta_not_exists.json"));
+        assert!(res.is_err());
+        assert_eq!(res.unwrap_err().kind(), ErrorKind::NotFound);
+    }
+}
