@@ -26,7 +26,7 @@ mod tests {
     use crate::commands::mvt::{build_contours, MapboxVectorTiles};
     use crate::dem::{DEMRaster, Origin};
     use crate::metajson::DummyMetaJsonParser;
-    use crate::utils::with_input_and_output_paths;
+    use crate::test::with_input_and_output_paths;
 
     #[test]
     fn bails_on_input_dir_empty() {
@@ -161,7 +161,7 @@ fn build_contours<T: CoordNum>(dem: &DEMRaster, elevation_offset: f32, world_siz
         .iter()
         .map(|x| { (elevation_offset + x).to_f64().unwrap()})
         .collect::<Vec<f64>>();
-    let res = builder.contours(&dem64, &thresholds).map(|_: Vec<Feature>| {
+    let res = builder.contours(&dem64, &thresholds).map(|features: Vec<Feature>| {
         /*
             c.iter().map(|geojson_feature: &Feature| {
                 let points: Bbox = geojson_feature.geometry.unwrap().bbox.unwrap();

@@ -10,6 +10,7 @@ mod tilejson;
 mod utils;
 mod mvt;
 mod feature;
+mod test;
 
 fn main() {
     let args: Vec<_> = std::env::args().collect();

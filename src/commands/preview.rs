@@ -16,7 +16,7 @@ mod tests {
     use std::io::Write;
     use std::path::{Path};
     use crate::commands::preview::Preview;
-    use crate::utils::with_input_and_output_paths;
+    use crate::test::with_input_and_output_paths;
 
     #[test]
     fn exec_bails_if_input_preview_file_does_not_exist() {

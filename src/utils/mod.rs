@@ -1,6 +1,5 @@
 mod build_tile_set;
 mod tile_error;
-mod test_helper;
 
 use image::{codecs::png::PngEncoder, DynamicImage, GenericImageView};
 use std::fs::File;
@@ -9,7 +8,6 @@ use std::path::Path;
 
 pub use build_tile_set::build_tile_set;
 pub use tile_error::TileError;
-pub use test_helper::with_input_and_output_paths;
 
 pub const TILE_SIZE_IN_PX: u32 = 256;
 

@@ -113,7 +113,7 @@ mod tests {
     use std::path::PathBuf;
     use clap::{App, ArgMatches};
     use crate::commands::{get_input_output_path_parameters, register_input_output_path_parameters};
-    use crate::utils::with_input_and_output_paths;
+    use crate::test::with_input_and_output_paths;
 
     fn clap_command_with_params(args: Vec<String>) -> anyhow::Result<(PathBuf, PathBuf)> {
         let app = register_input_output_path_parameters(App::new("x"));
