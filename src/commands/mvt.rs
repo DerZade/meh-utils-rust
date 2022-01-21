@@ -1,4 +1,7 @@
-use anyhow::bail;
+use std::cmp::Ordering;
+use anyhow::{bail};
+use num_traits::cast::ToPrimitive;
+
 use geo::map_coords::MapCoordsInplace;
 use geo::{CoordNum, GeoFloat};
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
@@ -11,6 +14,8 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use std::time::Instant;
+use contour::ContourBuilder;
+use geojson::{Feature};
 use crate::metajson::{MetaJsonParser};
 
 #[cfg(test)]
@@ -26,6 +31,11 @@ mod tests {
             let result = (MapboxVectorTiles::new(Box::new(DummyMetaJsonParser { succeeds: true }))).exec(&input_path, &output_path);
             assert!(result.is_err());
         });
+    }
+
+    #[test]
+    fn build_contours_does_its_thing() {
+        // let foo = DEMRaster::new();
     }
 }
 
@@ -114,9 +124,38 @@ fn calc_max_lod (_world_size: u32) -> u8 {
     return 5_u8;
 }
 
-fn build_contours<T: CoordNum>(_dem: &DEMRaster, _elevation_offset: f32, _world_size: u32, _collections: &mut HashMap<String, FeatureCollection<T>>) -> anyhow::Result<()> {
-    // TODO
-    Ok(())
+
+fn build_contours<T: CoordNum>(dem: &DEMRaster, elevation_offset: f32, world_size: u32, collections: &mut HashMap<String, FeatureCollection<T>>) -> anyhow::Result<()> {
+    let to_i32 = |f: &f32| {f.to_i32().unwrap()};
+    let cmp = |a: &&f32, b: &&f32| -> Ordering {a.partial_cmp(b).unwrap()};
+
+    let min_elevation = dem.get_data().iter().min_by(cmp).map(to_i32).ok_or(anyhow::Error::msg("no values in DEM raster"))?;
+    let max_elevation = dem.get_data().iter().max_by(|a: &&f32, b: &&f32| -> Ordering {a.partial_cmp(b).unwrap()}).map(to_i32).ok_or(anyhow::Error::msg("no values in DEM raster"))?;
+    // hmm how do we use worldsize? do we?
+
+    let builder = ContourBuilder::new(dem.dimensions().0 as u32, dem.dimensions().1 as u32, false);
+    let step = 10;
+    let thresholds: Vec<f64> = (min_elevation..max_elevation).step_by(step).map(|x| {x.to_f64().unwrap()}).collect();
+    let dem64slice = dem
+        .get_data()
+        .iter()
+        .map(|x| { (elevation_offset + x).to_f64().unwrap()})
+        .collect::<Vec<f64>>();
+    let res = builder.contours(&dem64slice, &thresholds).map(|c: Vec<Feature>| {
+        /*
+            c.iter().map(|geojson_feature: &Feature| {
+                let points: Bbox = geojson_feature.geometry.unwrap().bbox.unwrap();
+
+            })
+        */
+        collections.insert(String::from("contour_lines"), FeatureCollection(vec![]));
+        ()
+    });
+
+    match res {
+        Ok(_) => Ok(()),
+        Err(e) => Err(anyhow::Error::new(e))
+    }
 }
 
 const TILE_SIZE: u64 = 4096;

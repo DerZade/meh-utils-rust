@@ -409,6 +409,7 @@ dependencies = [
  "image",
  "mvt",
  "nom",
+ "num-traits",
  "rayon",
  "serde",
  "serde_json",
