@@ -21,7 +21,10 @@ use crate::metajson::{MetaJsonParser};
 #[cfg(test)]
 #[allow(unused_must_use)]
 mod tests {
-    use crate::commands::mvt::MapboxVectorTiles;
+    use std::collections::HashMap;
+    use geojson::FeatureCollection;
+    use crate::commands::mvt::{build_contours, MapboxVectorTiles};
+    use crate::dem::{DEMRaster, Origin};
     use crate::metajson::DummyMetaJsonParser;
     use crate::utils::with_input_and_output_paths;
 
@@ -35,7 +38,24 @@ mod tests {
 
     #[test]
     fn build_contours_does_its_thing() {
-        // let foo = DEMRaster::new();
+        let raster = DEMRaster::new(5, 6, Origin::Corner(0.0, 0.0), 10.0, -9999.99, vec![
+            0.0, 2.0, 3.5, 2.0, 0.0,
+            0.0, 4.0, 7.0, 4.0, 0.0,
+            0.0, 8.0, 9.0, 8.0, 4.0,
+            0.0, 4.0, 7.0, 4.0, 0.0,
+            0.0, 2.0, 3.5, 2.0, 0.0,
+            0.0, 1.0, 2.0, 1.0, 0.0,
+        ]);
+        let mut collections: HashMap<String, crate::feature::FeatureCollection<f32>> = HashMap::new();
+
+        let res = build_contours(&raster, 5.0, 2048, &mut collections);
+
+        assert!(res.is_ok());
+        assert_eq!(collections.len(), 1);
+        assert!(collections.contains_key("contour_lines"));
+        let contour_lines = collections.get("contour_lines").unwrap();
+        assert_eq!(contour_lines.len(), 1);
+        // println!("ookay collection: {}", collections.get("contour_lines").unwrap().0.len());
     }
 }
 
@@ -136,12 +156,12 @@ fn build_contours<T: CoordNum>(dem: &DEMRaster, elevation_offset: f32, world_siz
     let builder = ContourBuilder::new(dem.dimensions().0 as u32, dem.dimensions().1 as u32, false);
     let step = 10;
     let thresholds: Vec<f64> = (min_elevation..max_elevation).step_by(step).map(|x| {x.to_f64().unwrap()}).collect();
-    let dem64slice = dem
+    let dem64 = dem
         .get_data()
         .iter()
         .map(|x| { (elevation_offset + x).to_f64().unwrap()})
         .collect::<Vec<f64>>();
-    let res = builder.contours(&dem64slice, &thresholds).map(|c: Vec<Feature>| {
+    let res = builder.contours(&dem64, &thresholds).map(|_: Vec<Feature>| {
         /*
             c.iter().map(|geojson_feature: &Feature| {
                 let points: Bbox = geojson_feature.geometry.unwrap().bbox.unwrap();
