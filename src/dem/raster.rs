@@ -67,4 +67,8 @@ impl DEMRaster {
     pub fn get_data(&self) -> &Vec<f32> {
         &self.data
     }
+
+    pub fn get_no_data_value(&self) -> f32 {
+        self.no_data_value
+    }
 }

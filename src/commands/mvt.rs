@@ -16,15 +16,19 @@ use std::path::Path;
 use std::time::Instant;
 use contour::ContourBuilder;
 use geojson::{Feature};
+use crate::feature::Feature as CrateFeature;
 use crate::metajson::{MetaJsonParser};
 
 #[cfg(test)]
 #[allow(unused_must_use)]
 mod tests {
     use std::collections::HashMap;
-    use geojson::FeatureCollection;
+    use geojson::{Geometry};
+    use geojson::Feature;
+    use geojson::Value::MultiPolygon;
     use crate::commands::mvt::{build_contours, MapboxVectorTiles};
     use crate::dem::{DEMRaster, Origin};
+    use crate::feature::Feature as CrateFeature;
     use crate::metajson::DummyMetaJsonParser;
     use crate::test::with_input_and_output_paths;
 
@@ -56,6 +60,29 @@ mod tests {
         let contour_lines = collections.get("contour_lines").unwrap();
         assert_eq!(contour_lines.len(), 1);
         // println!("ookay collection: {}", collections.get("contour_lines").unwrap().0.len());
+    }
+
+    #[test]
+    fn from_geojsonfeature_for_cratefeature_works_for_empty_multipolygon() {
+        let geojsonfeature = Feature {
+            bbox: None,
+            geometry: Some(Geometry {bbox: None, value: MultiPolygon(vec![]), foreign_members: None}),
+            id: None,
+            properties: None,
+            foreign_members: None,
+        };
+
+        let cratefeature = CrateFeature::try_from(geojsonfeature);
+
+        assert!(cratefeature.is_ok())
+    }
+}
+
+impl TryFrom<Feature> for CrateFeature<f32> {
+    type Error = ();
+
+    fn try_from(_value: Feature) -> Result<Self, Self::Error> {
+        todo!()
     }
 }
 
@@ -145,12 +172,14 @@ fn calc_max_lod (_world_size: u32) -> u8 {
 }
 
 
-fn build_contours<T: CoordNum>(dem: &DEMRaster, elevation_offset: f32, world_size: u32, collections: &mut HashMap<String, FeatureCollection<T>>) -> anyhow::Result<()> {
+
+fn build_contours<T: CoordNum>(dem: &DEMRaster, elevation_offset: f32, _: u32, collections: &mut HashMap<String, FeatureCollection<T>>) -> anyhow::Result<()> {
     let to_i32 = |f: &f32| {f.to_i32().unwrap()};
     let cmp = |a: &&f32, b: &&f32| -> Ordering {a.partial_cmp(b).unwrap()};
 
-    let min_elevation = dem.get_data().iter().min_by(cmp).map(to_i32).ok_or(anyhow::Error::msg("no values in DEM raster"))?;
-    let max_elevation = dem.get_data().iter().max_by(|a: &&f32, b: &&f32| -> Ordering {a.partial_cmp(b).unwrap()}).map(to_i32).ok_or(anyhow::Error::msg("no values in DEM raster"))?;
+    let no_data_value = dem.get_no_data_value();
+    let min_elevation = dem.get_data().iter().filter(|x| {*x != &no_data_value}).min_by(cmp).map(to_i32).ok_or(anyhow::Error::msg("no values in DEM raster"))?;
+    let max_elevation = dem.get_data().iter().filter(|x| {*x != &no_data_value}).max_by(|a: &&f32, b: &&f32| -> Ordering {a.partial_cmp(b).unwrap()}).map(to_i32).ok_or(anyhow::Error::msg("no values in DEM raster"))?;
     // hmm how do we use worldsize? do we?
 
     let builder = ContourBuilder::new(dem.dimensions().0 as u32, dem.dimensions().1 as u32, false);
@@ -161,7 +190,7 @@ fn build_contours<T: CoordNum>(dem: &DEMRaster, elevation_offset: f32, world_siz
         .iter()
         .map(|x| { (elevation_offset + x).to_f64().unwrap()})
         .collect::<Vec<f64>>();
-    let res = builder.contours(&dem64, &thresholds).map(|features: Vec<Feature>| {
+    let res = builder.contours(&dem64, &thresholds).map(|_: Vec<Feature>| {
         /*
             c.iter().map(|geojson_feature: &Feature| {
                 let points: Bbox = geojson_feature.geometry.unwrap().bbox.unwrap();
@@ -198,8 +227,8 @@ fn build_vector_tiles<T: CoordNum + Send + GeoFloat + From<f32>>(output_path: &P
     });
 
     for lod in (0..=max_lod).rev() {
-        let lod_dir = output_path.join(lod.to_string());
-        let start = Instant::now();
+        let _lod_dir = output_path.join(lod.to_string());
+        let _start = Instant::now();
 
 		// project from last LOD to this LOD
         if lod != max_lod {
@@ -256,6 +285,6 @@ fn project_layers_in_place<T: CoordNum, F: Fn(&(T, T)) -> (T, T) + Copy>(layers:
     }
 }
 
-fn simplify_mounts<T: CoordNum>(collection: &mut FeatureCollection<T>, threshold: f64) {
+fn simplify_mounts<T: CoordNum>(_: &mut FeatureCollection<T>, _: f64) {
     todo!();
 }

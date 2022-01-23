@@ -160,8 +160,8 @@ impl<T: GeoFloat> Simplifiable<T> for FeatureCollection<T> {
     // The iterator returned by iter_mut will yield &mut T, by convention.
 
 
-    fn remove_empty(&mut self, line_limit: T, area_limit: T) -> () {
-        todo!();
+    fn remove_empty(&mut self, _line_limit: T, _area_limit: T) -> () {
+        todo!()
         /*
         self.0 = self.0.into_iter().filter_map(|f| {
             Some(f)
@@ -184,6 +184,5 @@ impl<T: GeoFloat> Simplifiable<T> for FeatureCollection<T> {
         //     }
         // }).collect();
 
-        todo!()
     }
 }
