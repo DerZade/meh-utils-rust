@@ -1,9 +1,9 @@
 use std::cmp::Ordering;
-use anyhow::{bail};
+use anyhow::{bail, Error};
 use num_traits::cast::ToPrimitive;
 
 use geo::map_coords::MapCoordsInplace;
-use geo::{CoordNum, GeoFloat};
+use geo::{Coordinate, CoordNum, GeoFloat, Geometry, LineString, MultiPoint, Polygon};
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 
 use crate::dem::{DEMRaster, load_dem};
@@ -15,7 +15,8 @@ use std::path::Path;
 
 use std::time::Instant;
 use contour::ContourBuilder;
-use geojson::{Feature};
+use geo::Geometry::Point;
+use geojson::{Feature, Value};
 use crate::feature::Feature as CrateFeature;
 use crate::metajson::{MetaJsonParser};
 
@@ -23,10 +24,10 @@ use crate::metajson::{MetaJsonParser};
 #[allow(unused_must_use)]
 mod tests {
     use std::collections::HashMap;
-    use geojson::{Geometry};
+    use geojson::{Geometry, Value};
     use geojson::Feature;
-    use geojson::Value::MultiPolygon;
-    use crate::commands::mvt::{build_contours, MapboxVectorTiles};
+    use geojson::Value::{MultiPolygon};
+    use crate::commands::mvt::{build_contours, MapboxVectorTiles, try_from_geojson_feature_for_crate_feature, try_from_geojson_value_for_geo_geometry};
     use crate::dem::{DEMRaster, Origin};
     use crate::feature::Feature as CrateFeature;
     use crate::metajson::DummyMetaJsonParser;
@@ -72,19 +73,61 @@ mod tests {
             foreign_members: None,
         };
 
-        let cratefeature = CrateFeature::try_from(geojsonfeature);
+        let cratefeature: anyhow::Result<CrateFeature<f32>> = try_from_geojson_feature_for_crate_feature(geojsonfeature);
 
         assert!(cratefeature.is_ok())
     }
-}
 
-impl TryFrom<Feature> for CrateFeature<f32> {
-    type Error = ();
+    #[test]
+    fn tryfrom_geojson_value_for_geotypes_geometry_point() {
+        let geojson_point: Value = Value::Point(vec![0.0, 1.1]);
 
-    fn try_from(_value: Feature) -> Result<Self, Self::Error> {
-        todo!()
+        let geotypes_point = try_from_geojson_value_for_geo_geometry(geojson_point);
+
+        assert!(geotypes_point.is_ok());
+        let geometry: geo::Geometry<f32> = geotypes_point.unwrap();
+        match geometry {
+            geo::Geometry::Point(pointtype) => {
+                assert_eq!(pointtype.x(), 0.0);
+                assert_eq!(pointtype.y(), 1.1);
+            },
+            _ => panic!()
+
+        }
     }
 }
+
+pub fn try_from_geojson_feature_for_crate_feature(value: Feature) -> anyhow::Result<CrateFeature<f32>> {
+    match value.geometry {
+        Some(g) => {
+            try_from_geojson_value_for_geo_geometry(g.value).map(|geo| {
+                CrateFeature {
+                    geometry: geo,
+                    properties: HashMap::new(),
+                }
+            })
+        },
+        None => Err(Error::msg("no geometry found"))
+    }
+}
+
+fn try_from_geojson_value_for_geo_geometry(value: Value) -> anyhow::Result<Geometry<f32>> {
+    match value {
+        Value::Point(pt) => {
+            let coordinates = pt.iter().map(|f| {f.to_f32().unwrap()}).collect::<Vec<f32>>();
+            let x = coordinates[0];
+            let y = coordinates[1];
+            Ok(Point(geo::Point(Coordinate {x, y})))
+        },
+        Value::MultiPoint(mp) => {Ok(geo::Geometry::MultiPoint(geo::MultiPoint(vec![geo::Point(Coordinate {x: 0.0, y: 1.1}), geo::Point(Coordinate {x: 1.1, y: 2.2})])))},
+        Value::LineString(_) => {todo!()},
+        Value::MultiLineString(_) => {todo!()},
+        Value::Polygon(_) => {todo!()},
+        Value::MultiPolygon(_) => {Ok(geo::Geometry::MultiPolygon(geo::MultiPolygon(vec![geo::Polygon::new(LineString(vec![Coordinate {x: 1.0, y: 2.0}]), vec![LineString(vec![Coordinate {x: 1.0, y: 2.0}])])])))},
+        Value::GeometryCollection(_) => {todo!()},
+    }
+}
+
 
 pub struct MapboxVectorTiles {
     meta_json: Box<dyn MetaJsonParser>,
@@ -173,7 +216,7 @@ fn calc_max_lod (_world_size: u32) -> u8 {
 
 
 
-fn build_contours<T: CoordNum>(dem: &DEMRaster, elevation_offset: f32, _: u32, collections: &mut HashMap<String, FeatureCollection<T>>) -> anyhow::Result<()> {
+fn build_contours(dem: &DEMRaster, elevation_offset: f32, _: u32, collections: &mut HashMap<String, FeatureCollection<f32>>) -> anyhow::Result<()> {
     let to_i32 = |f: &f32| {f.to_i32().unwrap()};
     let cmp = |a: &&f32, b: &&f32| -> Ordering {a.partial_cmp(b).unwrap()};
 
@@ -190,14 +233,19 @@ fn build_contours<T: CoordNum>(dem: &DEMRaster, elevation_offset: f32, _: u32, c
         .iter()
         .map(|x| { (elevation_offset + x).to_f64().unwrap()})
         .collect::<Vec<f64>>();
-    let res = builder.contours(&dem64, &thresholds).map(|_: Vec<Feature>| {
+    let res = builder.contours(&dem64, &thresholds).map(|features: Vec<Feature>| {
         /*
             c.iter().map(|geojson_feature: &Feature| {
                 let points: Bbox = geojson_feature.geometry.unwrap().bbox.unwrap();
 
             })
         */
-        collections.insert(String::from("contour_lines"), FeatureCollection(vec![]));
+        let foo: Vec<CrateFeature<f32>> = features.into_iter().filter_map(|f| {
+            try_from_geojson_feature_for_crate_feature(f).ok()
+        }).collect();
+
+        let k = String::from("contour_lines");
+        collections.insert(k, FeatureCollection(foo));
         ()
     });
 
