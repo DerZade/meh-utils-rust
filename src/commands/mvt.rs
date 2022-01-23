@@ -1,47 +1,50 @@
 use anyhow::bail;
-use clap::{arg, App};
 use geo::map_coords::MapCoordsInplace;
 use geo::{CoordNum, GeoFloat};
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 
-use crate::commands::Command;
 use crate::dem::{DEMRaster, load_dem};
 use crate::feature::{FeatureCollection, Simplifiable};
 use crate::mvt::{load_geo_jsons, build_mounts};
 
 use std::collections::HashMap;
-use std::ops::Div;
 use std::path::Path;
 
 use std::time::Instant;
+use crate::metajson::{MetaJsonParser};
 
-pub struct MapboxVectorTiles {}
+#[cfg(test)]
+#[allow(unused_must_use)]
+mod tests {
+    use crate::commands::mvt::MapboxVectorTiles;
+    use crate::metajson::DummyMetaJsonParser;
+    use crate::utils::with_input_and_output_paths;
 
-impl Command for MapboxVectorTiles {
-    fn register(&self) -> App<'static> {
-        App::new("mvt")
-            .about("Build mabox vector tiles from grad_meh data.")
-            .arg(arg!(-i --input <INPUT_DIR> "Path to grad_meh map directory"))
-            .arg(arg!(-o --output <OUTPUT_DIR> "Path to output directory"))
+    #[test]
+    fn bails_on_input_dir_empty() {
+        with_input_and_output_paths(|input_path, output_path| {
+            let result = (MapboxVectorTiles::new(Box::new(DummyMetaJsonParser { succeeds: true }))).exec(&input_path, &output_path);
+            assert!(result.is_err());
+        });
     }
-    fn run(&self, args: &clap::ArgMatches) -> anyhow::Result<()> {
+}
+
+pub struct MapboxVectorTiles {
+    meta_json: Box<dyn MetaJsonParser>,
+}
+impl MapboxVectorTiles {
+    pub fn new(meta_json: Box<dyn MetaJsonParser>) -> Self {
+        MapboxVectorTiles { meta_json }
+    }
+
+    pub fn exec(&self, input_path: &Path, output_path: &Path) -> anyhow::Result<()> {
         let mut collections: HashMap<String, FeatureCollection<f32>> = HashMap::new();
 
         let start = Instant::now();
 
-        let input_path_str = args.value_of("input").unwrap();
-        let output_path_str = args.value_of("output").unwrap();
-
-        let input_path = Path::new(input_path_str);
-        let output_path = Path::new(output_path_str);
-
-        if !output_path.is_dir() {
-            bail!("Output path is not a directory");
-        }
-
         println!("▶️  Loading meta.json");
         let meta_path = input_path.join("meta.json");
-        let meta = crate::metajson::from_file(&meta_path)?;
+        let meta = self.meta_json.parse(&meta_path)?;
         println!("✔️  Loaded meta.json");
 
         // load DEM
@@ -51,7 +54,7 @@ impl Command for MapboxVectorTiles {
         if !dem_path.is_file() {
             bail!("Couldn't find dem.asc.gz");
         }
-        let dem = load_dem(&dem_path)?;
+        let dem: DEMRaster = load_dem(&dem_path)?;
         println!("✔️  Loaded DEM in {}ms", now.elapsed().as_millis());
 
         // contour lines
