@@ -75,7 +75,14 @@ mod tests {
 
         let cratefeature: anyhow::Result<CrateFeature<f32>> = try_from_geojson_feature_for_crate_feature(geojsonfeature);
 
-        assert!(cratefeature.is_ok())
+        assert!(cratefeature.is_ok());
+        match cratefeature.unwrap().geometry {
+            geo::Geometry::MultiPolygon(geo::MultiPolygon(poly)) => {
+                assert_eq!(1, poly.len());
+            },
+            _ => panic!()
+        }
+
     }
 
     #[test]
