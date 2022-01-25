@@ -3,7 +3,7 @@ use anyhow::{bail, Error};
 use num_traits::cast::ToPrimitive;
 
 use geo::map_coords::MapCoordsInplace;
-use geo::{Coordinate, CoordNum, GeoFloat, Geometry, LineString, MultiPoint, Polygon};
+use geo::{Coordinate, CoordNum, GeoFloat, Geometry, LineString};
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 
 use crate::dem::{DEMRaster, load_dem};
@@ -24,6 +24,7 @@ use crate::metajson::{MetaJsonParser};
 #[allow(unused_must_use)]
 mod tests {
     use std::collections::HashMap;
+    use geo::Coordinate;
     use geojson::{Geometry, Value};
     use geojson::Feature;
     use geojson::Value::{MultiPolygon};
@@ -67,7 +68,16 @@ mod tests {
     fn from_geojsonfeature_for_cratefeature_works_for_empty_multipolygon() {
         let geojsonfeature = Feature {
             bbox: None,
-            geometry: Some(Geometry {bbox: None, value: MultiPolygon(vec![]), foreign_members: None}),
+            geometry: Some(Geometry {bbox: None, value: MultiPolygon(vec![ // one multipolygon consists of n polygons
+                vec![ // one polygon with one or more linear rings
+                    vec![ // one linear ring with n points, denoting the polygon surface
+                        vec![0.0, 1.1],
+                        vec![1.1, 2.2],
+                        vec![2.2, 0.0],
+                    ],
+                      // …optionally, more linear rings for holes in the surface
+                ]
+            ]), foreign_members: None}),
             id: None,
             properties: None,
             foreign_members: None,
@@ -79,6 +89,9 @@ mod tests {
         match cratefeature.unwrap().geometry {
             geo::Geometry::MultiPolygon(geo::MultiPolygon(poly)) => {
                 assert_eq!(1, poly.len());
+                let first_poly = &poly[0];
+                let exterior = &first_poly.exterior().0;
+                assert_eq!(exterior.first().unwrap(), &Coordinate {x: 0.0_f32, y: 1.1_f32 });
             },
             _ => panic!()
         }
@@ -99,7 +112,6 @@ mod tests {
                 assert_eq!(pointtype.y(), 1.1);
             },
             _ => panic!()
-
         }
     }
 }
