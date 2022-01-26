@@ -3,7 +3,7 @@ use anyhow::{bail, Error};
 use num_traits::cast::ToPrimitive;
 
 use geo::map_coords::MapCoordsInplace;
-use geo::{Coordinate, CoordNum, GeoFloat, Geometry, LineString};
+use geo::{Coordinate, CoordNum, GeoFloat, Geometry, LineString, Polygon};
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 
 use crate::dem::{DEMRaster, load_dem};
@@ -16,7 +16,7 @@ use std::path::Path;
 use std::time::Instant;
 use contour::ContourBuilder;
 use geo::Geometry::Point;
-use geojson::{Feature, Value};
+use geojson::{Feature, PointType, PolygonType, Value};
 use crate::feature::Feature as CrateFeature;
 use crate::metajson::{MetaJsonParser};
 
@@ -130,6 +130,13 @@ pub fn try_from_geojson_feature_for_crate_feature(value: Feature) -> anyhow::Res
     }
 }
 
+fn vec_f64_to_coordinate_f32(point: &Vec<f64>) -> Coordinate<f32> {
+    Coordinate {
+        x: point.get(0).unwrap().to_f32().unwrap(),
+        y: point.get(1).unwrap().to_f32().unwrap(),
+    }
+}
+
 fn try_from_geojson_value_for_geo_geometry(value: Value) -> anyhow::Result<Geometry<f32>> {
     match value {
         Value::Point(pt) => {
@@ -142,7 +149,19 @@ fn try_from_geojson_value_for_geo_geometry(value: Value) -> anyhow::Result<Geome
         Value::LineString(_) => {todo!()},
         Value::MultiLineString(_) => {todo!()},
         Value::Polygon(_) => {todo!()},
-        Value::MultiPolygon(_) => {Ok(geo::Geometry::MultiPolygon(geo::MultiPolygon(vec![geo::Polygon::new(LineString(vec![Coordinate {x: 1.0, y: 2.0}]), vec![LineString(vec![Coordinate {x: 1.0, y: 2.0}])])])))},
+        Value::MultiPolygon(mp) => {
+            let polygons: Vec<Polygon<f32>> = mp.iter().map(|poly: &PolygonType| {
+                // poly consists of linestrings:
+                let linestrings: Vec<LineString<f32>> = poly.iter().map(|line| {
+                    LineString(line.iter().map(vec_f64_to_coordinate_f32).collect::<Vec<Coordinate<f32>>>())
+                }).collect();
+                geo::Polygon::new(
+                    linestrings.first().unwrap().clone(),
+                    vec![]
+                )
+            }).collect();
+            Ok(geo::Geometry::MultiPolygon(geo::MultiPolygon(polygons)))
+        },
         Value::GeometryCollection(_) => {todo!()},
     }
 }
