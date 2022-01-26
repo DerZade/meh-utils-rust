@@ -130,37 +130,41 @@ pub fn try_from_geojson_feature_for_crate_feature(value: Feature) -> anyhow::Res
     }
 }
 
-fn vec_f64_to_coordinate_f32(point: &Vec<f64>) -> Coordinate<f32> {
-    Coordinate {
+fn vec_f64_to_coordinate_f32(point: &Vec<f64>) -> anyhow::Result<Coordinate<f32>> {
+    Ok(Coordinate {
         x: point.get(0).unwrap().to_f32().unwrap(),
         y: point.get(1).unwrap().to_f32().unwrap(),
-    }
+    })
 }
 
 fn try_from_geojson_value_for_geo_geometry(value: Value) -> anyhow::Result<Geometry<f32>> {
     match value {
         Value::Point(pt) => {
-            let coordinates = pt.iter().map(|f| {f.to_f32().unwrap()}).collect::<Vec<f32>>();
-            let x = coordinates[0];
-            let y = coordinates[1];
-            Ok(Point(geo::Point(Coordinate {x, y})))
+            vec_f64_to_coordinate_f32(&pt).map(|c| {
+                Point(geo::Point(c))
+            })
         },
         Value::MultiPoint(mp) => {Ok(geo::Geometry::MultiPoint(geo::MultiPoint(vec![geo::Point(Coordinate {x: 0.0, y: 1.1}), geo::Point(Coordinate {x: 1.1, y: 2.2})])))},
         Value::LineString(_) => {todo!()},
         Value::MultiLineString(_) => {todo!()},
         Value::Polygon(_) => {todo!()},
         Value::MultiPolygon(mp) => {
-            let polygons: Vec<Polygon<f32>> = mp.iter().map(|poly: &PolygonType| {
+            let poly_results: anyhow::Result<Vec<geo::Polygon<f32>>> = mp.iter().map(|poly: &PolygonType| {
                 // poly consists of linestrings:
-                let linestrings: Vec<LineString<f32>> = poly.iter().map(|line| {
-                    LineString(line.iter().map(vec_f64_to_coordinate_f32).collect::<Vec<Coordinate<f32>>>())
+                let linestring_results: anyhow::Result<Vec<LineString<f32>>> = poly.iter().map(|line| {
+                    let res: anyhow::Result<Vec<Coordinate<f32>>> = line.iter().map(vec_f64_to_coordinate_f32).into_iter().collect();
+                    res.map(|cs| {
+                        LineString(cs)
+                    })
                 }).collect();
-                geo::Polygon::new(
-                    linestrings.first().unwrap().clone(),
-                    vec![]
-                )
+                linestring_results.map(|linestrings| {
+                    geo::Polygon::new(
+                        linestrings.first().unwrap().clone(),
+                        vec![]
+                    )
+                })
             }).collect();
-            Ok(geo::Geometry::MultiPolygon(geo::MultiPolygon(polygons)))
+            poly_results.map(|p| {geo::Geometry::MultiPolygon(geo::MultiPolygon(p))})
         },
         Value::GeometryCollection(_) => {todo!()},
     }
