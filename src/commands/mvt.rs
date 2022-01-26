@@ -28,7 +28,7 @@ mod tests {
     use geojson::{Geometry, Value};
     use geojson::Feature;
     use geojson::Value::{MultiPolygon};
-    use crate::commands::mvt::{build_contours, MapboxVectorTiles, try_from_geojson_feature_for_crate_feature, try_from_geojson_value_for_geo_geometry};
+    use crate::commands::mvt::{build_contours, MapboxVectorTiles, try_from_geojson_feature_for_crate_feature, try_from_geojson_value_for_geo_geometry, vec_f64_to_coordinate_f32};
     use crate::dem::{DEMRaster, Origin};
     use crate::feature::Feature as CrateFeature;
     use crate::metajson::DummyMetaJsonParser;
@@ -62,6 +62,12 @@ mod tests {
         let contour_lines = collections.get("contour_lines").unwrap();
         assert_eq!(contour_lines.len(), 1);
         // println!("ookay collection: {}", collections.get("contour_lines").unwrap().0.len());
+    }
+
+    #[test]
+    fn vec_f64_to_coordinate_f32_all_the_things() {
+        assert_eq!(Coordinate {x: 0.0, y: 1.1 }, vec_f64_to_coordinate_f32(&vec![0.0_f64, 1.1_f64]).unwrap());
+        assert!(vec_f64_to_coordinate_f32(&vec![0.0]).is_err());
     }
 
     #[test]
@@ -131,10 +137,14 @@ pub fn try_from_geojson_feature_for_crate_feature(value: Feature) -> anyhow::Res
 }
 
 fn vec_f64_to_coordinate_f32(point: &Vec<f64>) -> anyhow::Result<Coordinate<f32>> {
-    Ok(Coordinate {
-        x: point.get(0).unwrap().to_f32().unwrap(),
-        y: point.get(1).unwrap().to_f32().unwrap(),
-    })
+    if point.len() < 2 {
+        Err(anyhow::Error::msg("vector is no coordinate pair: less than 2 values"))
+    } else {
+        match (point.get(0).map(|x| {x.to_f32()}), point.get(1).map(|x| {x.to_f32()})) {
+            (Some(Some(x)), Some(Some(y))) => Ok(Coordinate::from((x,y))),
+            _ => Err(anyhow::Error::msg("cannot convert vector to f32"))
+        }
+    }
 }
 
 fn try_from_geojson_value_for_geo_geometry(value: Value) -> anyhow::Result<Geometry<f32>> {
