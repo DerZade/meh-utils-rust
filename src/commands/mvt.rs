@@ -11,6 +11,8 @@ use crate::feature::{FeatureCollection, Simplifiable};
 use crate::mvt::{load_geo_jsons, build_mounts};
 
 use std::collections::HashMap;
+use std::iter::StepBy;
+use std::ops::RangeInclusive;
 use std::path::Path;
 
 use std::time::Instant;
@@ -23,14 +25,17 @@ use crate::metajson::{MetaJsonParser};
 #[cfg(test)]
 #[allow(unused_must_use)]
 mod tests {
+    use std::borrow::Borrow;
     use std::collections::HashMap;
-    use geo::Coordinate;
+    use std::fmt::Debug;
+    use anyhow::bail;
+    use geo::{Coordinate, Polygon};
     use geojson::{Geometry, Value};
     use geojson::Feature;
     use geojson::Value::{MultiPolygon};
     use crate::commands::mvt::{build_contours, MapboxVectorTiles, try_from_geojson_feature_for_crate_feature, try_from_geojson_value_for_geo_geometry, vec_f64_to_coordinate_f32};
     use crate::dem::{DEMRaster, Origin};
-    use crate::feature::Feature as CrateFeature;
+    use crate::feature::{Feature as CrateFeature, FeatureCollection};
     use crate::metajson::DummyMetaJsonParser;
     use crate::test::with_input_and_output_paths;
 
@@ -44,24 +49,59 @@ mod tests {
 
     #[test]
     fn build_contours_does_its_thing() {
+        let contour_line_to_vec_of_tuple = |feature: &CrateFeature<f32>| -> Vec<(f32, f32)> {
+            match &feature.geometry {
+                geo::Geometry::MultiPolygon(foo) => {
+                    let poly = foo.0.get(0).unwrap();
+                    let ext = poly.exterior();
+                    ext.0.iter().map(|f| { (f.x.clone(), f.y.clone()) }).collect()
+                },
+                _ => vec![],
+            }
+        };
+
         let raster = DEMRaster::new(5, 6, Origin::Corner(0.0, 0.0), 10.0, -9999.99, vec![
-            0.0, 2.0, 3.5, 2.0, 0.0,
-            0.0, 4.0, 7.0, 4.0, 0.0,
-            0.0, 8.0, 9.0, 8.0, 4.0,
-            0.0, 4.0, 7.0, 4.0, 0.0,
-            0.0, 2.0, 3.5, 2.0, 0.0,
-            0.0, 1.0, 2.0, 1.0, 0.0,
+            0.0, 0.5, 0.5, 0.0, 0.0,
+            1.0, 3.0, 3.0, 1.0, 0.0,
+            1.0, 7.0, 5.0, 3.0, 1.0,
+            1.0, 9.0, 5.0, 5.0, 1.0,
+            1.0, 7.0, 5.0, 3.0, 0.0,
+            0.0, 1.0, 1.0, 1.0, 0.0,
         ]);
         let mut collections: HashMap<String, crate::feature::FeatureCollection<f32>> = HashMap::new();
 
-        let res = build_contours(&raster, 5.0, 2048, &mut collections);
+        let res = build_contours(&raster, 0.0, 2048, 2, &mut collections);
 
         assert!(res.is_ok());
         assert_eq!(collections.len(), 1);
         assert!(collections.contains_key("contour_lines"));
-        let contour_lines = collections.get("contour_lines").unwrap();
-        assert_eq!(contour_lines.len(), 1);
-        // println!("ookay collection: {}", collections.get("contour_lines").unwrap().0.len());
+        let contour_lines: &FeatureCollection<f32> = collections.get("contour_lines").unwrap();
+        assert_eq!(contour_lines.len(), 5);
+        println!("ookay collection: {}", collections.get("contour_lines").unwrap().0.len());
+        let first: &geo::Geometry<f32> = &contour_lines.0.get(0).unwrap().geometry;
+        match first {
+            geo::Geometry::MultiPolygon(foo) => {
+                assert_eq!(1, foo.0.len());
+                let poly = foo.0.get(0).unwrap();
+                let ext = poly.exterior();
+                assert_eq!(0, poly.interiors().len());
+                let v: Vec<(f32, f32)> = ext.0.iter().map(|f| { (f.x.clone(), f.y.clone())}).collect();
+                // let c1 = ext.0.get(0).unwrap();
+                let str = v.iter().map(|x| {
+                    format!("({}, {})", x.0, x.1)
+                }).collect::<Vec<String>>().join(", ");
+                println!("v: {}", str);
+                assert_eq!(v, vec![
+                    (5.0, 5.5), (5.0, 4.5), (5.0, 3.5), (5.0, 2.5), (5.0, 1.5),
+                    (5.0, 0.5), (4.5, 0.0), (3.5, 0.0), (2.5, 0.0), (1.5, 0.0),
+                    (0.5, 0.0), (0.0, 0.5), (0.0, 1.5), (0.0, 2.5), (0.0, 3.5),
+                    (0.0, 4.5), (0.0, 5.5), (0.5, 6.0), (1.5, 6.0), (2.5, 6.0),
+                    (3.5, 6.0), (4.5, 6.0), (5.0, 5.5)
+                ]);
+            }
+            _ => assert!(false, "aaaagh wrong geometry type")
+        };
+        // assert_eq!(first)
     }
 
     #[test]
@@ -212,7 +252,7 @@ impl MapboxVectorTiles {
         // contour lines
         let now = Instant::now();
         println!("▶️  Building contour lines");
-        build_contours(&dem, meta.elevation_offset, meta.world_size, &mut collections)?;
+        build_contours(&dem, meta.elevation_offset, meta.world_size, 10, &mut collections)?;
         println!("✔️  Built contour lines in {}", now.elapsed().as_millis());
 
         // build mounts
@@ -268,23 +308,30 @@ fn calc_max_lod (_world_size: u32) -> u8 {
 
 
 
-fn build_contours(dem: &DEMRaster, elevation_offset: f32, _: u32, collections: &mut HashMap<String, FeatureCollection<f32>>) -> anyhow::Result<()> {
-    let to_i32 = |f: &f32| {f.to_i32().unwrap()};
-    let cmp = |a: &&f32, b: &&f32| -> Ordering {a.partial_cmp(b).unwrap()};
+fn build_contours(dem: &DEMRaster, elevation_offset: f32, _: u32, step: usize, collections: &mut HashMap<String, FeatureCollection<f32>>) -> anyhow::Result<()> {
+    let cmp = |a: &&f64, b: &&f64| -> Ordering {a.partial_cmp(b).unwrap()};
 
-    let no_data_value = dem.get_no_data_value();
-    let min_elevation = dem.get_data().iter().filter(|x| {*x != &no_data_value}).min_by(cmp).map(to_i32).ok_or(anyhow::Error::msg("no values in DEM raster"))?;
-    let max_elevation = dem.get_data().iter().filter(|x| {*x != &no_data_value}).max_by(|a: &&f32, b: &&f32| -> Ordering {a.partial_cmp(b).unwrap()}).map(to_i32).ok_or(anyhow::Error::msg("no values in DEM raster"))?;
-    // hmm how do we use worldsize? do we?
-
-    let builder = ContourBuilder::new(dem.dimensions().0 as u32, dem.dimensions().1 as u32, false);
-    let step = 10;
-    let thresholds: Vec<f64> = (min_elevation..max_elevation).step_by(step).map(|x| {x.to_f64().unwrap()}).collect();
+    let elevation_offset_f64 = elevation_offset.to_f64().unwrap();
     let dem64 = dem
         .get_data()
         .iter()
         .map(|x| { (elevation_offset + x).to_f64().unwrap()})
         .collect::<Vec<f64>>();
+
+    let no_data_value: f64 = dem.get_no_data_value().to_f64().unwrap();
+    let min_elevation = dem64.iter().filter(|x| {*x != &no_data_value}).min_by(cmp).map(|f| {f.to_i64().unwrap()}).ok_or(anyhow::Error::msg("no values in DEM raster"))?;
+    let max_elevation = dem64.iter().filter(|x| {*x != &no_data_value}).max_by(|a, b| -> Ordering {a.partial_cmp(b).unwrap()}).map(|f| {f.to_i64().unwrap()}).ok_or(anyhow::Error::msg("no values in DEM raster"))?;
+    // hmm how do we use worldsize? do we?
+
+    let builder = ContourBuilder::new(dem.dimensions().0 as u32, dem.dimensions().1 as u32, false);
+    let thresholds: Vec<f64> = (min_elevation..=max_elevation).step_by(step).map(|f| {f.to_f64().unwrap() + elevation_offset_f64}).collect();
+
+    println!("## contour builder ##");
+    println!("dimensions: {} by {}", dem.dimensions().0 as u32, dem.dimensions().1 as u32);
+    println!("all thresholds: {}", thresholds.iter().map(|f| {f.to_string()}).collect::<Vec<String>>().join(" "));
+    println!("elevation offset: {}", elevation_offset_f64);
+    println!("elevation offset: {}", elevation_offset_f64);
+
     let res = builder.contours(&dem64, &thresholds).map(|features: Vec<Feature>| {
         /*
             c.iter().map(|geojson_feature: &Feature| {
