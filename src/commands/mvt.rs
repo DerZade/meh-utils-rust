@@ -3,7 +3,7 @@ use anyhow::{bail, Error};
 use num_traits::cast::ToPrimitive;
 
 use geo::map_coords::MapCoordsInplace;
-use geo::{Coordinate, CoordNum, GeoFloat, Geometry, LineString, Polygon};
+use geo::{Coordinate, CoordNum, GeoFloat, Geometry, LineString};
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 
 use crate::dem::{DEMRaster, load_dem};
@@ -11,25 +11,20 @@ use crate::feature::{FeatureCollection, Simplifiable};
 use crate::mvt::{load_geo_jsons, build_mounts};
 
 use std::collections::HashMap;
-use std::iter::StepBy;
-use std::ops::RangeInclusive;
 use std::path::Path;
 
 use std::time::Instant;
 use contour::ContourBuilder;
 use geo::Geometry::Point;
-use geojson::{Feature, PointType, PolygonType, Value};
+use geojson::{Feature, PolygonType, Value};
 use crate::feature::Feature as CrateFeature;
 use crate::metajson::{MetaJsonParser};
 
 #[cfg(test)]
 #[allow(unused_must_use)]
 mod tests {
-    use std::borrow::Borrow;
     use std::collections::HashMap;
-    use std::fmt::Debug;
-    use anyhow::bail;
-    use geo::{Coordinate, Polygon};
+    use geo::{Coordinate};
     use geojson::{Geometry, Value};
     use geojson::Feature;
     use geojson::Value::{MultiPolygon};
@@ -78,30 +73,45 @@ mod tests {
         let contour_lines: &FeatureCollection<f32> = collections.get("contour_lines").unwrap();
         assert_eq!(contour_lines.len(), 5);
         println!("ookay collection: {}", collections.get("contour_lines").unwrap().0.len());
-        let first: &geo::Geometry<f32> = &contour_lines.0.get(0).unwrap().geometry;
-        match first {
-            geo::Geometry::MultiPolygon(foo) => {
-                assert_eq!(1, foo.0.len());
-                let poly = foo.0.get(0).unwrap();
-                let ext = poly.exterior();
-                assert_eq!(0, poly.interiors().len());
-                let v: Vec<(f32, f32)> = ext.0.iter().map(|f| { (f.x.clone(), f.y.clone())}).collect();
-                // let c1 = ext.0.get(0).unwrap();
-                let str = v.iter().map(|x| {
-                    format!("({}, {})", x.0, x.1)
-                }).collect::<Vec<String>>().join(", ");
-                println!("v: {}", str);
-                assert_eq!(v, vec![
-                    (5.0, 5.5), (5.0, 4.5), (5.0, 3.5), (5.0, 2.5), (5.0, 1.5),
-                    (5.0, 0.5), (4.5, 0.0), (3.5, 0.0), (2.5, 0.0), (1.5, 0.0),
-                    (0.5, 0.0), (0.0, 0.5), (0.0, 1.5), (0.0, 2.5), (0.0, 3.5),
-                    (0.0, 4.5), (0.0, 5.5), (0.5, 6.0), (1.5, 6.0), (2.5, 6.0),
-                    (3.5, 6.0), (4.5, 6.0), (5.0, 5.5)
-                ]);
-            }
-            _ => assert!(false, "aaaagh wrong geometry type")
-        };
-        // assert_eq!(first)
+
+        let v = contour_line_to_vec_of_tuple(contour_lines.0.get(0).unwrap());
+
+        assert_eq!(v, vec![
+            (5.0, 5.5), (5.0, 4.5), (5.0, 3.5), (5.0, 2.5), (5.0, 1.5),
+            (5.0, 0.5), (4.5, 0.0), (3.5, 0.0), (2.5, 0.0), (1.5, 0.0),
+            (0.5, 0.0), (0.0, 0.5), (0.0, 1.5), (0.0, 2.5), (0.0, 3.5),
+            (0.0, 4.5), (0.0, 5.5), (0.5, 6.0), (1.5, 6.0), (2.5, 6.0),
+            (3.5, 6.0), (4.5, 6.0), (5.0, 5.5)
+        ]);
+
+        let v = contour_line_to_vec_of_tuple(contour_lines.0.get(1).unwrap());
+
+        assert_eq!(v, vec![
+            (4.0, 4.5), (4.0, 3.5), (4.0, 2.5), (3.5, 2.0), (3.0, 1.5),
+            (2.5, 1.0), (1.5, 1.0), (1.0, 1.5), (1.0, 2.5), (1.0, 3.5),
+            (1.0, 4.5), (1.5, 5.0), (2.5, 5.0), (3.5, 5.0), (4.0, 4.5)
+        ]);
+
+        let v = contour_line_to_vec_of_tuple(contour_lines.0.get(2).unwrap());
+
+        assert_eq!(v, vec![
+            (3.0, 4.5), (3.5, 4.0), (4.0, 3.5), (3.5, 3.0), (3.0, 2.5),
+            (2.5, 2.0), (1.5, 2.0), (1.0, 2.5), (1.0, 3.5), (1.0, 4.5),
+            (1.5, 5.0), (2.5, 5.0), (3.0, 4.5)
+        ]);
+
+        let v = contour_line_to_vec_of_tuple(contour_lines.0.get(3).unwrap());
+
+        assert_eq!(v, vec![
+            (2.0, 4.5), (2.0, 3.5), (2.0, 2.5), (1.5, 2.0), (1.0, 2.5),
+            (1.0, 3.5), (1.0, 4.5), (1.5, 5.0), (2.0, 4.5)
+        ]);
+
+        let v = contour_line_to_vec_of_tuple(contour_lines.0.get(4).unwrap());
+
+        assert_eq!(v, vec![
+            (2.0, 3.5), (1.5, 3.0), (1.0, 3.5), (1.5, 4.0), (2.0, 3.5)
+        ]);
     }
 
     #[test]
@@ -194,7 +204,7 @@ fn try_from_geojson_value_for_geo_geometry(value: Value) -> anyhow::Result<Geome
                 Point(geo::Point(c))
             })
         },
-        Value::MultiPoint(mp) => {Ok(geo::Geometry::MultiPoint(geo::MultiPoint(vec![geo::Point(Coordinate {x: 0.0, y: 1.1}), geo::Point(Coordinate {x: 1.1, y: 2.2})])))},
+        Value::MultiPoint(_) => {Ok(geo::Geometry::MultiPoint(geo::MultiPoint(vec![geo::Point(Coordinate {x: 0.0, y: 1.1}), geo::Point(Coordinate {x: 1.1, y: 2.2})])))},
         Value::LineString(_) => {todo!()},
         Value::MultiLineString(_) => {todo!()},
         Value::Polygon(_) => {todo!()},
