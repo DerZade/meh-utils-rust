@@ -24,6 +24,7 @@ use crate::metajson::{MetaJsonParser};
 #[allow(unused_must_use)]
 mod tests {
     use std::collections::HashMap;
+    use std::path::Path;
     use geo::{Coordinate};
     use geojson::{Geometry, Value};
     use geojson::Feature;
@@ -41,6 +42,17 @@ mod tests {
             assert!(result.is_err());
         });
     }
+
+    #[test]
+    fn runs_successfully() {
+        with_input_and_output_paths(|_, output_path| {
+            let input_path = Path::new("./resources/test/happy/input").to_path_buf();
+            let result =  (MapboxVectorTiles::new(Box::new(DummyMetaJsonParser { succeeds: true }))).exec(&input_path, &output_path);
+
+            assert!(result.is_ok());
+        });
+    }
+
 
     #[test]
     fn build_contours_does_its_thing() {
