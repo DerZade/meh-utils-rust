@@ -1,8 +1,9 @@
+mod simplifiable;
+
 use std::collections::HashMap;
-use geo::{
-    algorithm::simplify::{Simplify},
-    Geometry, map_coords::MapCoordsInplace, CoordNum, GeoFloat, GeometryCollection
-};
+use geo::{map_coords::MapCoordsInplace, CoordNum, Geometry};
+
+pub use simplifiable::Simplifiable;
 
 #[derive(Clone)]
 pub enum PropertyValue {
@@ -75,6 +76,7 @@ pub struct Feature<T: CoordNum> {
 
 // pub type FeatureCollection<T> = Vec<Feature<T>>;
 
+#[derive(Clone)]
 pub struct FeatureCollection<T: CoordNum>(pub Vec<Feature<T>>);
 
 impl<T: CoordNum> std::ops::Deref for FeatureCollection<T> {
@@ -119,70 +121,5 @@ impl<T: CoordNum> MapCoordsInplace<T> for FeatureCollection<T> {
 impl<T: CoordNum> FeatureCollection<T> {
     pub fn new() -> Self {
         FeatureCollection(Vec::<Feature<T>>::new())
-    }
-}
-
-pub trait Simplifiable<T> {
-    fn simplify(&mut self, epsilon: T) -> ();
-    fn remove_empty(&mut self, line_limit: T, area_limit: T) -> ();
-}
-
-fn simplify_geo_collection<T: GeoFloat>(collection: &GeometryCollection<T>, epsilon: &T) -> GeometryCollection<T> {
-    return collection.iter().filter_map(|geo| simplify_geo(geo, epsilon)).collect()
-}
-
-fn simplify_geo<T: GeoFloat>(geometry: &Geometry<T>, epsilon: &T) -> Option<geo::Geometry<T>> {
-    match geometry {
-        Geometry::LineString(g) => Some(geo::Geometry::LineString(g.simplify(epsilon))),
-        Geometry::Polygon(g) => Some(geo::Geometry::Polygon(g.simplify(epsilon))),
-        Geometry::MultiLineString(g) => Some(geo::Geometry::MultiLineString(g.simplify(epsilon))),
-        Geometry::MultiPolygon(g) => Some(geo::Geometry::MultiPolygon(g.simplify(epsilon))),
-        Geometry::GeometryCollection(g) => Some(geo::Geometry::GeometryCollection(simplify_geo_collection(&g, epsilon))),
-        _ => None
-    }
-}
-
-impl<T: GeoFloat> Simplifiable<T> for FeatureCollection<T> {
-    fn simplify(&mut self, epsilon: T) {
-        self.0.iter_mut().for_each(|f| {
-            let opt = simplify_geo(&f.geometry, &epsilon);
-
-            if opt.is_some() {
-                f.geometry = opt.unwrap();
-            }
-        });
-    }
-
-    // TL;DR:
-
-    // The iterator returned by into_iter may yield any of T, &T or &mut T, depending on the context.
-    // The iterator returned by iter will yield &T, by convention.
-    // The iterator returned by iter_mut will yield &mut T, by convention.
-
-
-    fn remove_empty(&mut self, _line_limit: T, _area_limit: T) -> () {
-        todo!()
-        /*
-        self.0 = self.0.into_iter().filter_map(|f| {
-            Some(f)
-        }).collect();
-
-         */
-
-        // self = self.iter_mut().filter_map(|f| {
-        //     match &f.geometry {
-        //         Geometry::Point(_) => Some(f),
-        //         Geometry::Line(_) => todo!(),
-        //         Geometry::LineString(_) => todo!(),
-        //         Geometry::Polygon(_) => todo!(),
-        //         Geometry::MultiPoint(_) => Some(f),
-        //         Geometry::MultiLineString(_) => todo!(),
-        //         Geometry::MultiPolygon(_) => todo!(),
-        //         Geometry::GeometryCollection(_) => todo!(),
-        //         Geometry::Rect(_) => todo!(),
-        //         Geometry::Triangle(_) => todo!(),
-        //     }
-        // }).collect();
-
     }
 }

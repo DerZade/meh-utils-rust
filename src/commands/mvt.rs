@@ -8,9 +8,10 @@ use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 
 use crate::dem::{DEMRaster, load_dem};
 use crate::feature::{FeatureCollection, Simplifiable};
-use crate::mvt::{load_geo_jsons, build_mounts};
+use crate::mvt::{load_geo_jsons, build_mounts, find_lod_layers};
 
 use std::collections::HashMap;
+use std::iter::Sum;
 use std::path::Path;
 
 use std::time::Instant;
@@ -29,7 +30,8 @@ mod tests {
     use geojson::{Geometry, Value};
     use geojson::Feature;
     use geojson::Value::{MultiPolygon};
-    use crate::commands::mvt::{build_contours, MapboxVectorTiles, try_from_geojson_feature_for_crate_feature, try_from_geojson_value_for_geo_geometry, vec_f64_to_coordinate_f32};
+    use rand::{Rng, thread_rng};
+    use crate::commands::mvt::{build_contours, build_vector_tiles, fill_contour_layers, MapboxVectorTiles, try_from_geojson_feature_for_crate_feature, try_from_geojson_value_for_geo_geometry, vec_f64_to_coordinate_f32};
     use crate::dem::{DEMRaster, Origin};
     use crate::feature::{Feature as CrateFeature, FeatureCollection};
     use crate::metajson::DummyMetaJsonParser;
@@ -43,12 +45,12 @@ mod tests {
         });
     }
 
+    #[ignore]
     #[test]
     fn runs_successfully() {
         with_input_and_output_paths(|_, output_path| {
             let input_path = Path::new("./resources/test/happy/input").to_path_buf();
             let result =  (MapboxVectorTiles::new(Box::new(DummyMetaJsonParser { succeeds: true }))).exec(&input_path, &output_path);
-
             assert!(result.is_ok());
         });
     }
@@ -181,6 +183,88 @@ mod tests {
             },
             _ => panic!()
         }
+    }
+
+    #[test]
+    #[ignore]
+    fn build_vector_tiles_does_not_explode_on_0_lods() {
+        with_input_and_output_paths(|_, output_path| {
+            let res = build_vector_tiles(&output_path, HashMap::<String, FeatureCollection<f32>>::new(), 0, 1);
+
+            assert!(res.is_ok());
+        });
+    }
+
+    #[test]
+    #[ignore]
+    fn build_vector_tiles_does_not_explode_on_empty_input() {
+        with_input_and_output_paths(|_, output_path| {
+            let res = build_vector_tiles(&output_path, HashMap::<String, FeatureCollection<f32>>::new(), 1, 1);
+
+            assert!(res.is_ok());
+        });
+    }
+
+    fn some_feature() -> CrateFeature<f32> {
+        let mut rng = thread_rng();
+        let mut rand = || {rng.gen_range(0.0..127.0)};
+        CrateFeature {
+            geometry: geo::Geometry::Point(geo::Point(Coordinate {x:  rand(), y: rand()})),
+            properties: HashMap::new(),
+        }
+    }
+
+    fn collections_with_layers(layer_names: Vec<&str>/*, add_features: bool*/) -> HashMap<String, FeatureCollection<f32>> {
+        let mut collections = HashMap::new();
+        layer_names.iter().for_each(|layer_name| {
+            let collection = FeatureCollection::from_iter(vec![]);
+            collections.insert(layer_name.to_string(), collection);
+        });
+
+        collections
+    }
+
+    #[test]
+    fn fill_contour_layers_does_not_panic_if_no_contours_but_returns_err() {
+        let mut layers = HashMap::<String, FeatureCollection<f32>>::new();
+        let res = fill_contour_layers(vec!["foo".to_string(), "contours/1".to_string()], &mut layers);
+
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn fill_contour_layers_copies_all_features_from_contours_to_contours_1() {
+        let mut layers = collections_with_layers(vec!["contours", "contours/1", "foo"]);
+        layers.get_mut("foo").unwrap().push(some_feature());
+        layers.get_mut("contours").unwrap().push(some_feature());
+        layers.get_mut("contours").unwrap().push(some_feature());
+
+        fill_contour_layers(layers.keys().map(|f| {f.to_string()}).collect(), &mut layers);
+
+        let contours_1_features = &layers.get("contours/1").unwrap().0;
+        let contours_features = &layers.get("contours").unwrap().0;
+        assert_eq!(2, contours_1_features.len());
+        for i in 0..=1 {
+            assert_eq!(contours_features.get(i).unwrap().geometry, contours_1_features.get(i).unwrap().geometry);
+        }
+        assert_eq!(1, layers.get("foo").unwrap().len());
+    }
+
+    #[test]
+    fn fill_contour_layers_copies_only_every_fifth_feature_from_contours_to_contours_5() {
+        let mut layers = collections_with_layers(vec!["contours", "contours/5", "foo"]);
+        for _ in 0..11 {
+            layers.get_mut("contours").unwrap().push(some_feature());
+        }
+
+        fill_contour_layers(layers.keys().map(|f| {f.to_string()}).collect(), &mut layers);
+
+        let contours_5_features = &layers.get("contours/5").unwrap().0;
+        let contours_features = &layers.get("contours").unwrap().0;
+        assert_eq!(3, contours_5_features.len());
+        assert_eq!(contours_features.get(0).unwrap().geometry, contours_5_features.get(0).unwrap().geometry);
+        assert_eq!(contours_features.get(5).unwrap().geometry, contours_5_features.get(1).unwrap().geometry);
+        assert_eq!(contours_features.get(10).unwrap().geometry, contours_5_features.get(2).unwrap().geometry);
     }
 }
 
@@ -378,7 +462,7 @@ fn build_contours(dem: &DEMRaster, elevation_offset: f32, _: u32, step: usize, c
 
 const TILE_SIZE: u64 = 4096;
 
-fn build_vector_tiles<T: CoordNum + Send + GeoFloat + From<f32>>(output_path: &Path, mut collections: HashMap<String, FeatureCollection<T>>, max_lod: u8, world_size: u32) -> anyhow::Result<()> {
+fn build_vector_tiles<T: CoordNum + Send + GeoFloat + From<f32> + Sum>(output_path: &Path, mut collections: HashMap<String, FeatureCollection<T>>, max_lod: u8, world_size: u32) -> anyhow::Result<()> {
 
     let world_size = world_size as f32;
     let tiles_per_col_row = 2_u32.pow(max_lod as u32);
@@ -442,10 +526,42 @@ fn build_vector_tiles<T: CoordNum + Send + GeoFloat + From<f32>>(output_path: &P
                 }
             }
             // val.
-        })
+        });
+
+        let lod_layer_names = find_lod_layers(&collections, lod);
+        // note: the following is called fillContourLayers in https://github.com/DerZade/meh-utils/blob/master/internal/mvt/buildVectorTiles.go#L239-L278
+        fill_contour_layers(lod_layer_names, &mut collections).unwrap_or_else(|e| {
+            println!("could not generate contours for lod {}: {}", lod, e);
+        });
+        todo!("build LOD vector tiles");
     }
 
-    todo!();
+    Ok(())
+}
+
+/// there are layers matching `^contours/(\d+)$` . Matching group denotes contour line interval.
+/// Example: contours/10 is supposed to contain contour lines in 10m intervals.
+/// This function fills the `^contours/\d+$` layers selectively with features from "contours" layer.
+fn fill_contour_layers<T: CoordNum>(lod_layer_names: Vec<String>, collections: &mut HashMap<String, FeatureCollection<T>>) -> anyhow::Result<()> {
+    let contour_features = collections.get_mut("contours").ok_or(anyhow::Error::msg("foo"))?.clone();
+    let contours_names: Vec<(String, usize)> = lod_layer_names.iter().map(|name| {
+        let x = name.strip_prefix("contours/");
+        let n = x.map_or(0, |s| {
+            let i = s.parse::<usize>();
+            i.map_or(0, |n| {n})
+        });
+        (name.to_string(), n)
+    }).filter(|(_, interval)| {
+        interval != &0
+    }).collect();
+
+    contours_names.iter().for_each(|contour| {
+        let features = contour_features.clone();
+        features.iter().step_by(contour.1).for_each(|f| {
+            collections.get_mut(&contour.0).unwrap().push(f.clone());
+        });
+    });
+    Ok(())
 }
 
 fn project_layers_in_place<T: CoordNum, F: Fn(&(T, T)) -> (T, T) + Copy>(layers: &mut HashMap<String, FeatureCollection<T>>, transform: F) {
@@ -455,5 +571,5 @@ fn project_layers_in_place<T: CoordNum, F: Fn(&(T, T)) -> (T, T) + Copy>(layers:
 }
 
 fn simplify_mounts<T: CoordNum>(_: &mut FeatureCollection<T>, _: f64) {
-    todo!();
+    todo!("mount simplification");
 }

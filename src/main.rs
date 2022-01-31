@@ -10,6 +10,7 @@ mod tilejson;
 mod utils;
 mod mvt;
 mod feature;
+#[cfg(test)]
 mod test;
 
 fn main() {
