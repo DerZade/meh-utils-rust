@@ -87,7 +87,7 @@ impl ClapCommand for MvtTestCommand {
 
     fn exec(&self, _: &ArgMatches) -> Result<()> {
         let mut tile = mapbox_vector_tile::Tile::new();
-        tile.add_feature("foo_layer", mapbox_vector_tile::Feature::from(geo_types::Geometry::Point(geo::Point(Coordinate { x: 1, y: 2}))));
+        tile.add_feature("foo_layer", mapbox_vector_tile::Feature::from(geo::Geometry::Point(geo::Point(Coordinate { x: 1, y: 2}))));
 
         Ok(())
     }
