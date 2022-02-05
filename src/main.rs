@@ -1,5 +1,5 @@
 use clap::{App, app_from_crate, AppSettings};
-use crate::commands::{ClapCommand, PreviewCommand, SatCommand, MvtCommand, TerrainRgbCommand};
+use crate::commands::{ClapCommand, PreviewCommand, SatCommand, MvtCommand, TerrainRgbCommand, MvtTestCommand};
 use crate::metajson::SerdeMetaJsonParser;
 
 
@@ -28,6 +28,7 @@ fn execute(input: &[String]) -> anyhow::Result<()> {
         &SatCommand {},
         &TerrainRgbCommand {},
         &MvtCommand {},
+        &MvtTestCommand {},
         // Add commands here
     ];
 

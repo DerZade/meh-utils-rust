@@ -6,7 +6,8 @@ mod sat;
 use std::path::{Path, PathBuf};
 use anyhow::{bail, Error, Result};
 use clap::{App, arg, ArgMatches};
-use geo::{Coordinate, Geometry};
+use geo::{Coordinate};
+use mapbox_vector_tile::Layer;
 use crate::commands::mvt::MapboxVectorTiles;
 use crate::commands::preview::Preview;
 use crate::commands::sat::Sat;
@@ -87,7 +88,16 @@ impl ClapCommand for MvtTestCommand {
 
     fn exec(&self, _: &ArgMatches) -> Result<()> {
         let mut tile = mapbox_vector_tile::Tile::new();
-        tile.add_feature("foo_layer", mapbox_vector_tile::Feature::from(geo::Geometry::Point(geo::Point(Coordinate { x: 1, y: 2}))));
+        tile.add_layer("foo_layer");
+        tile.add_feature("foo_layer", mapbox_vector_tile::Feature::from(geo::Geometry::Point(geo::Point(Coordinate { x: 1, y: 1}))));
+        tile.add_feature("foo_layer", mapbox_vector_tile::Feature::from(geo::Geometry::Polygon(geo::Polygon::new(geo::LineString(vec![
+            Coordinate {x: 0, y: 0},
+            Coordinate {x: 0, y: 2},
+            Coordinate {x: 2, y: 2},
+            Coordinate {x: 2, y: 0},
+        ]), vec![]))));
+        tile.add_layer(Layer::new("bar"));
+        tile.write_to_file("./foo.bar");
 
         Ok(())
     }
