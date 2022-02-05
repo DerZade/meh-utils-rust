@@ -6,6 +6,7 @@ mod sat;
 use std::path::{Path, PathBuf};
 use anyhow::{bail, Error, Result};
 use clap::{App, arg, ArgMatches};
+use geo::{Coordinate, Geometry};
 use crate::commands::mvt::MapboxVectorTiles;
 use crate::commands::preview::Preview;
 use crate::commands::sat::Sat;
@@ -71,6 +72,24 @@ impl ClapCommand for MvtCommand {
         let (input_path, output_path) = get_input_output_path_parameters(matches)?;
         let mvt = MapboxVectorTiles::new(Box::new(SerdeMetaJsonParser {}));
         mvt.exec(&input_path, &output_path)
+    }
+}
+
+pub struct MvtTestCommand {}
+impl ClapCommand for MvtTestCommand {
+    fn get_identifier(&self) -> &str {
+        "mvt_test"
+    }
+
+    fn register(&self) -> App {
+        App::new(self.get_identifier()).about("test mapbox_vector_tiles crate that I want to use")
+    }
+
+    fn exec(&self, _: &ArgMatches) -> Result<()> {
+        let mut tile = mapbox_vector_tile::Tile::new();
+        tile.add_feature("foo_layer", mapbox_vector_tile::Feature::from(geo_types::Geometry::Point(geo::Point(Coordinate { x: 1, y: 2}))));
+
+        Ok(())
     }
 }
 
