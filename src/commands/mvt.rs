@@ -12,7 +12,7 @@ use crate::mvt::{load_geo_jsons, build_mounts, find_lod_layers};
 
 use std::collections::HashMap;
 use std::iter::Sum;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use std::time::Instant;
 use contour::ContourBuilder;
@@ -45,7 +45,6 @@ mod tests {
         });
     }
 
-    #[ignore]
     #[test]
     fn runs_successfully() {
         with_input_and_output_paths(|_, output_path| {
@@ -186,7 +185,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn build_vector_tiles_does_not_explode_on_0_lods() {
         with_input_and_output_paths(|_, output_path| {
             let res = build_vector_tiles(&output_path, HashMap::<String, FeatureCollection<f32>>::new(), 0, 1);
@@ -196,7 +194,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn build_vector_tiles_does_not_explode_on_empty_input() {
         with_input_and_output_paths(|_, output_path| {
             let res = build_vector_tiles(&output_path, HashMap::<String, FeatureCollection<f32>>::new(), 1, 1);
@@ -480,7 +477,7 @@ fn build_vector_tiles<T: CoordNum + Send + GeoFloat + From<f32> + Sum>(output_pa
     });
 
     for lod in (0..=max_lod).rev() {
-        let _lod_dir = output_path.join(lod.to_string());
+        let lod_dir: PathBuf = output_path.join(lod.to_string());
         let _start = Instant::now();
 
 		// project from last LOD to this LOD
@@ -533,7 +530,7 @@ fn build_vector_tiles<T: CoordNum + Send + GeoFloat + From<f32> + Sum>(output_pa
         fill_contour_layers(lod_layer_names, &mut collections).unwrap_or_else(|e| {
             println!("could not generate contours for lod {}: {}", lod, e);
         });
-        let res = build_lod_vector_tiles(&mut collections, world_size, lod);
+        let res = build_lod_vector_tiles(&mut collections, world_size, lod, lod_dir);
         if res.is_err() {
             println!("error when generating vector tiles for lod {}: {}", lod, res.err().unwrap());
         }
@@ -542,8 +539,11 @@ fn build_vector_tiles<T: CoordNum + Send + GeoFloat + From<f32> + Sum>(output_pa
     Ok(())
 }
 
-fn build_lod_vector_tiles<T: CoordNum>(collections: &mut HashMap<String, FeatureCollection<T>>, world_size: u32, lod: u8) -> anyhow::Result<()> {
-    println!("build_lod_vector_tiles with {} collections, worldsize {} and lod {}", collections.len(), world_size, lod);
+fn build_lod_vector_tiles<T: CoordNum>(collections: &mut HashMap<String, FeatureCollection<T>>, world_size: u32, lod: u8, lod_dir: PathBuf) -> anyhow::Result<()> {
+    println!("build_lod_vector_tiles with {} collections, worldsize {} and lod {} into {}", collections.len(), world_size, lod, lod_dir.to_str().unwrap_or("WAT"));
+    collections.iter().for_each(|(k, v,)| {
+
+    });
     Ok(())
 }
 
