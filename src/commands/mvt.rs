@@ -543,6 +543,7 @@ fn build_vector_tiles<T: CoordNum + Send + GeoFloat + From<f32> + Sum>(output_pa
 }
 
 fn build_lod_vector_tiles<T: CoordNum>(collections: &mut HashMap<String, FeatureCollection<T>>, world_size: u32, lod: u8) -> anyhow::Result<()> {
+    println!("build_lod_vector_tiles with {} collections, worldsize {} and lod {}", collections.len(), world_size, lod);
     Ok(())
 }
 
