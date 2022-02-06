@@ -2,6 +2,7 @@ mod simplifiable;
 
 use std::collections::HashMap;
 use geo::{map_coords::MapCoordsInplace, CoordNum, Geometry};
+use mapbox_vector_tile::Layer;
 
 pub use simplifiable::Simplifiable;
 
@@ -121,5 +122,11 @@ impl<T: CoordNum> MapCoordsInplace<T> for FeatureCollection<T> {
 impl<T: CoordNum> FeatureCollection<T> {
     pub fn new() -> Self {
         FeatureCollection(Vec::<Feature<T>>::new())
+    }
+}
+
+impl<T: CoordNum> Into<Layer> for FeatureCollection<T> {
+    fn into(self) -> Layer {
+        todo!()
     }
 }

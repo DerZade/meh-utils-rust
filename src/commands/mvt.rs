@@ -18,6 +18,7 @@ use std::time::Instant;
 use contour::ContourBuilder;
 use geo::Geometry::Point;
 use geojson::{Feature, PolygonType, Value};
+use mapbox_vector_tile::Layer;
 use crate::feature::Feature as CrateFeature;
 use crate::metajson::{MetaJsonParser};
 
@@ -464,13 +465,13 @@ const TILE_SIZE: u64 = 4096;
 
 fn build_vector_tiles<T: CoordNum + Send + GeoFloat + From<f32> + Sum>(output_path: &Path, mut collections: HashMap<String, FeatureCollection<T>>, max_lod: u8, world_size: u32) -> anyhow::Result<()> {
 
-    let world_size = world_size as f32;
+    let world_size_f32 = world_size as f32;
     let tiles_per_col_row = 2_u32.pow(max_lod as u32);
     let pixels = tiles_per_col_row as u64 * TILE_SIZE;
-    let factor = pixels as f32 / world_size;
+    let factor = pixels as f32 / world_size_f32;
 
     let factor_t: T = factor.into();
-    let world_size_t: T = world_size.into();
+    let world_size_t: T = world_size_f32.into();
 
     project_layers_in_place(&mut collections, |(x, y)| {
         (
@@ -534,8 +535,13 @@ fn build_vector_tiles<T: CoordNum + Send + GeoFloat + From<f32> + Sum>(output_pa
             println!("could not generate contours for lod {}: {}", lod, e);
         });
         todo!("build LOD vector tiles");
+        build_lod_vector_tiles(&mut collections, world_size, lod);
     }
 
+    Ok(())
+}
+
+fn build_lod_vector_tiles<T: CoordNum>(collections: &mut HashMap<String, FeatureCollection<T>>, world_size: u32, lod: u8) -> anyhow::Result<()> {
     Ok(())
 }
 
