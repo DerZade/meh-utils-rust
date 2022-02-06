@@ -1,10 +1,49 @@
 mod simplifiable;
 
 use std::collections::HashMap;
-use geo::{map_coords::MapCoordsInplace, CoordNum, Geometry};
+use geo::{map_coords::MapCoordsInplace, map_coords::MapCoords, CoordNum, Geometry};
 use mapbox_vector_tile::Layer;
 
 pub use simplifiable::Simplifiable;
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+    use geo::{Coordinate, Geometry, Point};
+    use mapbox_vector_tile::Layer;
+    use crate::feature::{Feature, FeatureCollection};
+
+    #[test]
+    fn feature_collection_to_layer() {
+        let mut feature_collection = FeatureCollection::new();
+        let features =         [
+            (0_usize, Coordinate {x: 1_i32, y: 1_i32}),
+            (1_usize, Coordinate {x: 4_i32, y: 4_i32}),
+        ];
+        features.iter().for_each(|(_, c)| {
+            let feature = Feature {
+                geometry: geo::Geometry::Point(geo::Point(c.clone())),
+                properties: HashMap::new(),
+            };
+            feature_collection.push(feature);
+        });
+
+        let layer: Layer = feature_collection.to_layer("foo".to_string());
+
+        assert_eq!(2, layer.features.len());
+        assert_eq!("foo".to_string(), layer.name);
+        [
+            (0_usize, Coordinate {x: 1_i32, y: 1_i32}),
+            (1_usize, Coordinate {x: 4_i32, y: 4_i32}),
+        ].into_iter().for_each(|(i, c1)| {
+            if let Geometry::Point(Point(c2)) = layer.features.get(i).unwrap().geometry {
+                assert_eq!(c1, c2);
+            } else {
+                assert!(false);
+            }
+        });
+    }
+}
 
 #[derive(Clone)]
 pub enum PropertyValue {
@@ -75,6 +114,21 @@ pub struct Feature<T: CoordNum> {
     pub properties: HashMap<String, PropertyValue>
 }
 
+impl Into<mapbox_vector_tile::Feature> for Feature<f32> {
+    fn into(self) -> mapbox_vector_tile::Feature {
+        let geometry: Geometry<f32> = self.geometry.clone();
+        mapbox_vector_tile::Feature::new(
+            geometry.map_coords(|(x, y)| {
+                (
+                    *x as i32,
+                    *y as i32,
+                )
+            }),
+            self.properties.into(),
+        )
+    }
+}
+
 // pub type FeatureCollection<T> = Vec<Feature<T>>;
 
 #[derive(Clone)]
@@ -123,10 +177,11 @@ impl<T: CoordNum> FeatureCollection<T> {
     pub fn new() -> Self {
         FeatureCollection(Vec::<Feature<T>>::new())
     }
-}
-
-impl<T: CoordNum> Into<Layer> for FeatureCollection<T> {
-    fn into(self) -> Layer {
-        todo!()
+    pub fn to_layer(&self, name: String) -> Layer {
+        let mut layer = Layer::new(name);
+        self.iter().for_each(|feature| {
+            layer.add_feature(feature.into());
+        });
+        layer
     }
 }

@@ -18,7 +18,6 @@ use std::time::Instant;
 use contour::ContourBuilder;
 use geo::Geometry::Point;
 use geojson::{Feature, PolygonType, Value};
-use mapbox_vector_tile::Layer;
 use crate::feature::Feature as CrateFeature;
 use crate::metajson::{MetaJsonParser};
 
@@ -534,8 +533,10 @@ fn build_vector_tiles<T: CoordNum + Send + GeoFloat + From<f32> + Sum>(output_pa
         fill_contour_layers(lod_layer_names, &mut collections).unwrap_or_else(|e| {
             println!("could not generate contours for lod {}: {}", lod, e);
         });
-        todo!("build LOD vector tiles");
-        build_lod_vector_tiles(&mut collections, world_size, lod);
+        let res = build_lod_vector_tiles(&mut collections, world_size, lod);
+        if res.is_err() {
+            println!("error when generating vector tiles for lod {}: {}", lod, res.err().unwrap());
+        }
     }
 
     Ok(())
