@@ -18,6 +18,7 @@ use std::time::Instant;
 use contour::ContourBuilder;
 use geo::Geometry::Point;
 use geojson::{Feature, PolygonType, Value};
+use mapbox_vector_tile::Tile;
 use crate::feature::Feature as CrateFeature;
 use crate::metajson::{MetaJsonParser};
 
@@ -553,10 +554,14 @@ fn build_vector_tiles<T: CoordNum + Send + GeoFloat + From<f32> + Sum>(output_pa
     Ok(())
 }
 
+fn create_tile<T: CoordNum>(col: u32, row: u32, collections: &mut HashMap<String, FeatureCollection<T>>) -> anyhow::Result<Tile> {
+    Ok(Tile::new())
+}
+
 fn build_lod_vector_tiles<T: CoordNum>(collections: &mut HashMap<String, FeatureCollection<T>>, world_size: u32, lod: u8, lod_dir: &PathBuf) -> anyhow::Result<()> {
     println!("build_lod_vector_tiles with {} collections, worldsize {} and lod {} into {}", collections.len(), world_size, lod, lod_dir.to_str().unwrap_or("WAT"));
 
-    fn ensure_directory(dir: PathBuf) -> Result<(), Error>{
+    fn ensure_directory(dir: &PathBuf) -> Result<(), Error>{
         if !dir.is_dir() {
             std::fs::create_dir(dir).map_err(|e| {Error::new(e)})
         } else {
@@ -568,10 +573,13 @@ fn build_lod_vector_tiles<T: CoordNum>(collections: &mut HashMap<String, Feature
 
     for col in 0..tiles_per_dimension {
         let col_path= lod_dir.join(PathBuf::from(col.to_string()));
-        ensure_directory(col_path);
+        ensure_directory(&col_path)?;
 
         for row in 0..tiles_per_dimension {
-
+            let tile = create_tile(col, row, collections)?;
+            let file_path_buf = col_path.join(format!("{}.pbf", row));
+            let file_path = file_path_buf.to_str().ok_or(Error::msg("couldnt create filename. wat."))?;
+            tile.write_to_file(file_path);
         }
     }
 
