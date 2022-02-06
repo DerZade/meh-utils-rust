@@ -31,7 +31,7 @@ mod tests {
     use geojson::Feature;
     use geojson::Value::{MultiPolygon};
     use rand::{Rng, thread_rng};
-    use crate::commands::mvt::{build_contours, build_vector_tiles, fill_contour_layers, MapboxVectorTiles, try_from_geojson_feature_for_crate_feature, try_from_geojson_value_for_geo_geometry, vec_f64_to_coordinate_f32};
+    use crate::commands::mvt::{build_contours, build_lod_vector_tiles, build_vector_tiles, fill_contour_layers, MapboxVectorTiles, try_from_geojson_feature_for_crate_feature, try_from_geojson_value_for_geo_geometry, vec_f64_to_coordinate_f32};
     use crate::dem::{DEMRaster, Origin};
     use crate::feature::{Feature as CrateFeature, FeatureCollection};
     use crate::metajson::DummyMetaJsonParser;
@@ -262,6 +262,20 @@ mod tests {
         assert_eq!(contours_features.get(0).unwrap().geometry, contours_5_features.get(0).unwrap().geometry);
         assert_eq!(contours_features.get(5).unwrap().geometry, contours_5_features.get(1).unwrap().geometry);
         assert_eq!(contours_features.get(10).unwrap().geometry, contours_5_features.get(2).unwrap().geometry);
+    }
+
+    #[test]
+    fn build_lod_vector_tiles_creates_directories() {
+        with_input_and_output_paths(|_, output_path| {
+            let mut layers = collections_with_layers(vec!["bar"]);
+
+            let res = build_lod_vector_tiles(&mut layers, 4096, 2, &output_path);
+
+            assert!(output_path.is_dir());
+            assert!(output_path.join("0").is_dir());
+            assert!(output_path.join("3").is_dir());
+            assert!(!output_path.join("4").is_dir());
+        });
     }
 }
 
@@ -530,7 +544,7 @@ fn build_vector_tiles<T: CoordNum + Send + GeoFloat + From<f32> + Sum>(output_pa
         fill_contour_layers(lod_layer_names, &mut collections).unwrap_or_else(|e| {
             println!("could not generate contours for lod {}: {}", lod, e);
         });
-        let res = build_lod_vector_tiles(&mut collections, world_size, lod, lod_dir);
+        let res = build_lod_vector_tiles(&mut collections, world_size, lod, &lod_dir);
         if res.is_err() {
             println!("error when generating vector tiles for lod {}: {}", lod, res.err().unwrap());
         }
@@ -539,11 +553,28 @@ fn build_vector_tiles<T: CoordNum + Send + GeoFloat + From<f32> + Sum>(output_pa
     Ok(())
 }
 
-fn build_lod_vector_tiles<T: CoordNum>(collections: &mut HashMap<String, FeatureCollection<T>>, world_size: u32, lod: u8, lod_dir: PathBuf) -> anyhow::Result<()> {
+fn build_lod_vector_tiles<T: CoordNum>(collections: &mut HashMap<String, FeatureCollection<T>>, world_size: u32, lod: u8, lod_dir: &PathBuf) -> anyhow::Result<()> {
     println!("build_lod_vector_tiles with {} collections, worldsize {} and lod {} into {}", collections.len(), world_size, lod, lod_dir.to_str().unwrap_or("WAT"));
-    collections.iter().for_each(|(k, v,)| {
 
-    });
+    fn ensure_directory(dir: PathBuf) -> Result<(), Error>{
+        if !dir.is_dir() {
+            std::fs::create_dir(dir).map_err(|e| {Error::new(e)})
+        } else {
+            Ok(())
+        }
+    }
+
+    let tiles_per_dimension: u32 = (2 as u32).pow(lod as u32);
+
+    for col in 0..tiles_per_dimension {
+        let col_path= lod_dir.join(PathBuf::from(col.to_string()));
+        ensure_directory(col_path);
+
+        for row in 0..tiles_per_dimension {
+
+        }
+    }
+
     Ok(())
 }
 
