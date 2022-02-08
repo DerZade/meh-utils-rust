@@ -1,5 +1,7 @@
 use geo::contains::Contains;
-use geo::{Geometry, GeoNum, Line, Point, Rect};
+use geo::{CoordFloat, GeoFloat, Geometry, GeoNum, Line, Point, Rect};
+use geo::algorithm::line_intersection::{line_intersection, LineIntersection};
+use geo::map_coords::MapCoords;
 
 #[cfg(test)]
 mod tests {
@@ -89,12 +91,12 @@ mod tests {
 
 // it would be neat to generalize this to a Diff trait (subtract one geometry from another!)
 // but that would be overkill much. do not need.
-pub trait Clip<T: GeoNum, Rhs=Self> {
+pub trait Clip<T: GeoFloat, Rhs=Self> {
     type Output;
     fn clip(&self, rect: &Rect<T>) ->  Option<Self::Output>;
 }
 
-impl<T: GeoNum> Clip<T> for Geometry<T> {
+impl<T: CoordFloat> Clip<T> for Geometry<T> {
     type Output=Geometry<T>;
     fn clip(&self, rect: &Rect<T>) -> Option<Geometry<T>> {
         match self {
@@ -105,20 +107,28 @@ impl<T: GeoNum> Clip<T> for Geometry<T> {
     }
 }
 
-impl<T: GeoNum> Clip<T> for Line<T> {
+impl<T: GeoFloat> Clip<T> for Line<T> {
     type Output = Line<T>;
 
     fn clip(&self, rect: &Rect<T>) -> Option<Self::Output> {
         if rect.contains(&self.start) && rect.contains(&self.end) {
             Some(self.clone())
         } else {
+            let box_lines = rect.to_polygon().exterior().lines().collect::<Vec<Line<T>>>();
+             box_lines.into_iter().for_each(|box_line| {
+                let intersection = line_intersection(box_line.clone(), self.map_coords(|(x, y)| {(x.to_f64(), y.to_f64())}));
+
+            });
+
+
+            let intersector = line_intersection(self, );
             // TODO
             None
         }
     }
 }
 
-impl<T: GeoNum> Clip<T> for Point<T> {
+impl<T: GeoFloat> Clip<T> for Point<T> {
     type Output = Point<T>;
 
     fn clip(&self, rect: &Rect<T>) -> Option<Self::Output> {
