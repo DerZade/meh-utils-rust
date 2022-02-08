@@ -1,5 +1,5 @@
 use geo::contains::Contains;
-use geo::{CoordFloat, GeoFloat, Geometry, GeoNum, Line, Point, Rect};
+use geo::{CoordFloat, Coordinate, GeoFloat, Geometry, GeoNum, Line, Point, Rect};
 use geo::algorithm::line_intersection::{line_intersection, LineIntersection};
 use geo::map_coords::MapCoords;
 
@@ -11,10 +11,10 @@ mod tests {
     #[test]
     fn clip_point_returns_none_if_point_outside_of_box() {
         let rect = Rect::new(
-            Coordinate {x: 0, y: 0},
-            Coordinate {x: 5, y: 10},
+            Coordinate {x: 0.0, y: 0.0},
+            Coordinate {x: 5.0, y: 10.0},
         );
-        let point: Geometry<i32> = geo::Geometry::Point(Point(Coordinate {x: 6, y: 5}));
+        let point = geo::Geometry::Point(Point(Coordinate {x: 6.0, y: 5.0}));
 
         let clipped  = point.clip(&rect);
 
@@ -24,10 +24,10 @@ mod tests {
     #[test]
     fn clip_point_returns_point_if_point_inside_of_box() {
         let rect = Rect::new(
-            Coordinate {x: 0, y: 0},
-            Coordinate {x: 5, y: 10},
+            Coordinate {x: 0.0, y: 0.0},
+            Coordinate {x: 5.0, y: 10.0},
         );
-        let point: Geometry<i32> = geo::Geometry::Point(Point(Coordinate {x: 1, y: 5}));
+        let point = geo::Geometry::Point(Point(Coordinate {x: 1.0, y: 5.0}));
 
         let clipped = point.clip(&rect);
 
@@ -38,13 +38,13 @@ mod tests {
     #[test]
     fn clip_line_returns_none_if_linestring_outside_of_box() {
         let rect = Rect::new(
-            Coordinate {x: 0, y: 0},
-            Coordinate {x: 5, y: 10},
+            Coordinate {x: 0.0, y: 0.0},
+            Coordinate {x: 5.0, y: 10.0},
         );
 
         let line = geo::Geometry::Line(Line::new(
-            Coordinate {x: 4, y: -3},
-            Coordinate {x: 8, y: 5},
+            Coordinate {x: 4.0, y: -3.0},
+            Coordinate {x: 8.0, y: 5.0},
         ));
 
         let clipped = line.clip(&rect);
@@ -55,13 +55,13 @@ mod tests {
     #[test]
     fn clip_line_returns_complete_line_if_line_inside_of_box() {
         let rect = Rect::new(
-            Coordinate {x: 0, y: 0},
-            Coordinate {x: 5, y: 10},
+            Coordinate {x: 0.0, y: 0.0},
+            Coordinate {x: 5.0, y: 10.0},
         );
 
         let line = geo::Geometry::Line(Line::new(
-            Coordinate {x: 1, y: 1},
-            Coordinate {x: 3, y: 3},
+            Coordinate {x: 1.0, y: 1.0},
+            Coordinate {x: 3.0, y: 3.0},
         ));
 
         let clipped = line.clip(&rect);
@@ -73,13 +73,13 @@ mod tests {
     #[test]
     fn clip_line_returns_complete_line_if_line_on_edge_of_box() {
         let rect = Rect::new(
-            Coordinate {x: 0, y: 0},
-            Coordinate {x: 5, y: 10},
+            Coordinate {x: 0.0, y: 0.0},
+            Coordinate {x: 5.0, y: 10.0},
         );
 
         let line = geo::Geometry::Line(Line::new(
-            Coordinate {x: 0, y: 0},
-            Coordinate {x: 5, y: 0},
+            Coordinate {x: 0.0, y: 0.0},
+            Coordinate {x: 5.0, y: 0.0},
         ));
 
         let clipped = line.clip(&rect);
@@ -96,7 +96,7 @@ pub trait Clip<T: GeoFloat, Rhs=Self> {
     fn clip(&self, rect: &Rect<T>) ->  Option<Self::Output>;
 }
 
-impl<T: CoordFloat> Clip<T> for Geometry<T> {
+impl<T: GeoFloat> Clip<T> for Geometry<T> {
     type Output=Geometry<T>;
     fn clip(&self, rect: &Rect<T>) -> Option<Geometry<T>> {
         match self {
@@ -107,21 +107,25 @@ impl<T: CoordFloat> Clip<T> for Geometry<T> {
     }
 }
 
+fn contains<T: GeoFloat>(rect: &Rect<T>, coord: &Coordinate<T>) -> bool {
+    coord.x >= rect.min().x
+        && coord.x <= rect.max().x
+        && coord.y >= rect.min().y
+        && coord.y <= rect.max().y
+}
+
 impl<T: GeoFloat> Clip<T> for Line<T> {
     type Output = Line<T>;
 
     fn clip(&self, rect: &Rect<T>) -> Option<Self::Output> {
-        if rect.contains(&self.start) && rect.contains(&self.end) {
+        if contains(rect, &self.start) && contains(rect, &self.end) {
             Some(self.clone())
         } else {
             let box_lines = rect.to_polygon().exterior().lines().collect::<Vec<Line<T>>>();
              box_lines.into_iter().for_each(|box_line| {
-                let intersection = line_intersection(box_line.clone(), self.map_coords(|(x, y)| {(x.to_f64(), y.to_f64())}));
+                let intersection = line_intersection(box_line.clone(), self.clone());
 
             });
-
-
-            let intersector = line_intersection(self, );
             // TODO
             None
         }
