@@ -272,6 +272,7 @@ mod tests {
 
             let res = build_lod_vector_tiles(&mut layers, 4096, 2, &output_path);
 
+            assert!(res.is_ok());
             assert!(output_path.is_dir());
             assert!(output_path.join("0").is_dir());
             assert!(output_path.join("3").is_dir());
@@ -555,6 +556,21 @@ fn build_vector_tiles<T: CoordNum + Send + GeoFloat + From<f32> + Sum>(output_pa
 }
 
 fn create_tile<T: CoordNum>(col: u32, row: u32, collections: &mut HashMap<String, FeatureCollection<T>>) -> anyhow::Result<Tile> {
+    println!("create_tile with col {}, row {}, and {} collections", col, row, collections.len());
+
+    // get offset for this tile
+    // get bounds in orb coordinates (?)
+    // define projection from global coordinates to tile coordinates
+
+    // map feature collections to layer models
+    // for each layer:
+        // for each geometry:
+            // clone
+            // clip the clone to tile bounds (clip.Geometry)
+            // project onto tile coordinates
+        // collect
+    // define tile, put layers into it
+
     Ok(Tile::new())
 }
 
