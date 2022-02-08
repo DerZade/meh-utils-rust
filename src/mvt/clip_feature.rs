@@ -1,4 +1,3 @@
-use std::ops::BitAnd;
 use geo::contains::Contains;
 use geo::{Geometry, GeoNum, Line, Point, Rect};
 
@@ -110,10 +109,12 @@ impl<T: GeoNum> Clip<T> for Line<T> {
     type Output = Line<T>;
 
     fn clip(&self, rect: &Rect<T>) -> Option<Self::Output> {
-        true
-            .bitand(rect.contains(&self.start))
-            .bitand(rect.contains(&self.end))
-            .then(|| {self.clone()})
+        if rect.contains(&self.start) && rect.contains(&self.end) {
+            Some(self.clone())
+        } else {
+            // TODO
+            None
+        }
     }
 }
 
