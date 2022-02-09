@@ -125,6 +125,46 @@ mod tests {
             assert!(false, "no line!");
         }
     }
+
+    #[test]
+    fn clip_line_returns_clipped_line_if_line_starts_within_but_goes_outside_the_box() {
+        let rect = Rect::new(
+            Coordinate {x: 0.0, y: 0.0},
+            Coordinate {x: 5.0, y: 10.0},
+        );
+
+        let line = geo::Geometry::Line(Line::new(
+            Coordinate {x: 2.5, y: 5.0},
+            Coordinate {x: 7.5, y: 10.0},
+        ));
+
+        let clipped = line.clip(&rect);
+
+        assert!(clipped.is_some());
+        if let Some(geo::Geometry::Line(clipped_line)) = clipped {
+            assert_eq!(clipped_line.start, Coordinate {x: 2.5, y: 5.0});
+            assert_eq!(clipped_line.end, Coordinate {x: 5.0, y: 7.5});
+        } else {
+            assert!(false, "no line!");
+        }
+
+        let line = geo::Geometry::Line(Line::new(
+            Coordinate {x: 7.5, y: 10.0},
+            Coordinate {x: 2.5, y: 5.0},
+
+        ));
+
+        let clipped = line.clip(&rect);
+
+        assert!(clipped.is_some());
+        if let Some(geo::Geometry::Line(clipped_line)) = clipped {
+            assert_eq!(clipped_line.end, Coordinate {x: 2.5, y: 5.0});
+            assert_eq!(clipped_line.start, Coordinate {x: 5.0, y: 7.5});
+        } else {
+            assert!(false, "no line!");
+        }
+    }
+
 }
 
 // it would be neat to generalize this to a Diff trait (subtract one geometry from another!)
