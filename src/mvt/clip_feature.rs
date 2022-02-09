@@ -87,6 +87,29 @@ mod tests {
         assert!(clipped.is_some());
         assert_eq!(clipped.unwrap(), line);
     }
+
+    #[test]
+    fn clip_line_returns_clipped_line_if_line_passes_through_box() {
+        let rect = Rect::new(
+            Coordinate {x: 0.0, y: 0.0},
+            Coordinate {x: 5.0, y: 10.0},
+        );
+
+        let line = geo::Geometry::Line(Line::new(
+            Coordinate {x: -2.5, y: 0.0},
+            Coordinate {x: 7.5, y: 10.0},
+        ));
+
+        let clipped = line.clip(&rect);
+
+        assert!(clipped.is_some());
+        if let Some(geo::Geometry::Line(clipped_line)) = clipped {
+            assert_eq!(clipped_line.start, Coordinate {x: 0.0, y: 2.5});
+            assert_eq!(clipped_line.end, Coordinate {x: 5.0, y: 7.5});
+        } else {
+            assert!(false, "no line!");
+        }
+    }
 }
 
 // it would be neat to generalize this to a Diff trait (subtract one geometry from another!)
@@ -118,16 +141,29 @@ impl<T: GeoFloat> Clip<T> for Line<T> {
     type Output = Line<T>;
 
     fn clip(&self, rect: &Rect<T>) -> Option<Self::Output> {
-        if contains(rect, &self.start) && contains(rect, &self.end) {
-            Some(self.clone())
-        } else {
-            let box_lines = rect.to_polygon().exterior().lines().collect::<Vec<Line<T>>>();
-             box_lines.into_iter().for_each(|box_line| {
-                let intersection = line_intersection(box_line.clone(), self.clone());
+        let box_lines = rect.to_polygon().exterior().lines().collect::<Vec<Line<T>>>();
+        let intersections = box_lines.into_iter().filter_map(|box_line| {
+            line_intersection(box_line.clone(), self.clone())
+        }).collect::<Vec<LineIntersection<T>>>();
 
-            });
-            // TODO
-            None
+        let start_contained = contains(rect, &self.start);
+        let end_contained = contains(rect, &self.end);
+
+        match intersections.len() {
+            0 => None,
+            1 => {
+                if let Some(LineIntersection::SinglePoint { intersection, is_proper}) = intersections.get(0) {
+                    if start_contained {
+                        Some(Line::new(self.start.clone(), intersection.clone()))
+                    } else {
+                        Some(Line::new(intersection.clone(), self.end.clone()))
+                    }
+                } else {
+                    None
+                }
+            },
+            2 => None,
+            _ => None,
         }
     }
 }
