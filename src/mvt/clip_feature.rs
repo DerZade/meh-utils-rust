@@ -1,6 +1,7 @@
 use geo::contains::Contains;
 use geo::{CoordFloat, Coordinate, GeoFloat, Geometry, GeoNum, Line, Point, Rect};
 use geo::algorithm::line_intersection::{line_intersection, LineIntersection};
+use geo::algorithm::euclidean_distance::EuclideanDistance;
 use geo::map_coords::MapCoords;
 
 #[cfg(test)]
@@ -149,21 +150,52 @@ impl<T: GeoFloat> Clip<T> for Line<T> {
         let start_contained = contains(rect, &self.start);
         let end_contained = contains(rect, &self.end);
 
-        match intersections.len() {
-            0 => None,
-            1 => {
-                if let Some(LineIntersection::SinglePoint { intersection, is_proper}) = intersections.get(0) {
-                    if start_contained {
-                        Some(Line::new(self.start.clone(), intersection.clone()))
+        let (collinears, single_points): (Vec<LineIntersection<T>>,Vec<LineIntersection<T>>) = intersections.into_iter().partition(|i| {
+            match i {
+                LineIntersection::Collinear {intersection: _} => true,
+                LineIntersection::SinglePoint {intersection: _, is_proper: _ } => false,
+            }
+        });
+        let collinear = collinears.get(0);
+        if let Some(LineIntersection::Collinear {intersection}) = collinear {
+            Some(intersection.clone())
+        } else {
+            let single_points_points: Vec<Coordinate<T>> = single_points.into_iter().filter_map(|sp| {match sp {
+                LineIntersection::SinglePoint {intersection, is_proper: _} => Some(intersection.clone()),
+                _ => None
+            }}).collect();
+
+            match single_points_points.len() {
+                0 => {
+                    if start_contained && end_contained {
+                        Some(self.clone())
                     } else {
-                        Some(Line::new(intersection.clone(), self.end.clone()))
+                        None
                     }
-                } else {
-                    None
-                }
-            },
-            2 => None,
-            _ => None,
+                },
+                1 => {
+                    if let Some(intersection) = single_points_points.get(0) {
+                        if start_contained {
+                            Some(Line::new(self.start.clone(), intersection.clone()))
+                        } else {
+                            Some(Line::new(intersection.clone(), self.end.clone()))
+                        }
+                    } else {
+                        None
+                    }
+                },
+                2 => {
+                    // if let Some(LineIntersection::Collinear { intersection}) = intersections
+                    let i1 = single_points_points.get(0).unwrap();
+                    let i2 = single_points_points.get(1).unwrap();
+                    if i1.euclidean_distance(&self.start) < i2.euclidean_distance(&self.start) {
+                        Some(Line::new(i1.clone(), i2.clone()))
+                    } else {
+                        Some(Line::new(i2.clone(), i1.clone()))
+                    }
+                },
+                _ => None,
+            }
         }
     }
 }
