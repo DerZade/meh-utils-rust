@@ -210,16 +210,15 @@ impl<T: GeoFloat> Clip<T> for Line<T> {
                 LineIntersection::SinglePoint {intersection: _, is_proper: _ } => false,
             }
         });
-        let collinear = collinears.get(0);
-        if let Some(LineIntersection::Collinear {intersection}) = collinear {
+        if let Some(LineIntersection::Collinear {intersection}) = collinears.first() {
             Some(intersection.clone())
         } else {
-            let single_points_points: Vec<Coordinate<T>> = single_points.into_iter().filter_map(|sp| {match sp {
+            let single_point_coordinates: Vec<Coordinate<T>> = single_points.into_iter().filter_map(|sp| {match sp {
                 LineIntersection::SinglePoint {intersection, is_proper: _} => Some(intersection.clone()),
                 _ => None
             }}).collect();
 
-            match (single_points_points.get(0), single_points_points.get(1)) {
+            match (single_point_coordinates.get(0), single_point_coordinates.get(1)) {
                 (None, None) => {
                     if start_contained && end_contained {
                         Some(self.clone())
