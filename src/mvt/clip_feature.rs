@@ -219,36 +219,30 @@ impl<T: GeoFloat> Clip<T> for Line<T> {
                 _ => None
             }}).collect();
 
-            match single_points_points.len() {
-                0 => {
+            match (single_points_points.get(0), single_points_points.get(1)) {
+                (None, None) => {
                     if start_contained && end_contained {
                         Some(self.clone())
                     } else {
                         None
                     }
                 },
-                1 => {
-                    if let Some(intersection) = single_points_points.get(0) {
-                        if start_contained {
-                            Some(Line::new(self.start.clone(), intersection.clone()))
-                        } else {
-                            Some(Line::new(intersection.clone(), self.end.clone()))
-                        }
+                (Some(intersection), None) => {
+                    if start_contained {
+                        Some(Line::new(self.start.clone(), intersection.clone()))
                     } else {
-                        None
+                        Some(Line::new(intersection.clone(), self.end.clone()))
                     }
+
                 },
-                2 => {
-                    // if let Some(LineIntersection::Collinear { intersection}) = intersections
-                    let i1 = single_points_points.get(0).unwrap();
-                    let i2 = single_points_points.get(1).unwrap();
+                (Some(i1), Some(i2)) => {
                     if i1.euclidean_distance(&self.start) < i2.euclidean_distance(&self.start) {
                         Some(Line::new(i1.clone(), i2.clone()))
                     } else {
                         Some(Line::new(i2.clone(), i1.clone()))
                     }
-                },
-                _ => None,
+                }
+                (None, Some(_)) => { panic!("this should never happen")}
             }
         }
     }
