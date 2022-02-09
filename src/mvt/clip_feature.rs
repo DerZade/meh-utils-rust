@@ -1,12 +1,11 @@
 use geo::contains::Contains;
-use geo::{CoordFloat, Coordinate, GeoFloat, Geometry, GeoNum, Line, Point, Rect};
+use geo::{Coordinate, GeoFloat, Geometry, Line, Point, Rect};
 use geo::algorithm::line_intersection::{line_intersection, LineIntersection};
 use geo::algorithm::euclidean_distance::EuclideanDistance;
-use geo::map_coords::MapCoords;
 
 #[cfg(test)]
 mod tests {
-    use geo::{Coordinate, Geometry, Line, Point, Rect};
+    use geo::{Coordinate, Line, Point, Rect};
     use crate::mvt::clip_feature::Clip;
 
     #[test]
@@ -107,6 +106,21 @@ mod tests {
         if let Some(geo::Geometry::Line(clipped_line)) = clipped {
             assert_eq!(clipped_line.start, Coordinate {x: 0.0, y: 2.5});
             assert_eq!(clipped_line.end, Coordinate {x: 5.0, y: 7.5});
+        } else {
+            assert!(false, "no line!");
+        }
+
+        let line = geo::Geometry::Line(Line::new(
+            Coordinate {x: 7.5, y: 10.0},
+            Coordinate {x: -2.5, y: 0.0},
+        ));
+
+        let clipped = line.clip(&rect);
+
+        assert!(clipped.is_some());
+        if let Some(geo::Geometry::Line(clipped_line)) = clipped {
+            assert_eq!(clipped_line.start, Coordinate {x: 5.0, y: 7.5});
+            assert_eq!(clipped_line.end, Coordinate {x: 0.0, y: 2.5});
         } else {
             assert!(false, "no line!");
         }
