@@ -1,12 +1,17 @@
-use geo::{Coordinate, GeoFloat, Geometry, Line, Point, Polygon, Rect};
+use anyhow::Error;
+use geo::{Coordinate, GeoFloat, Geometry, Line, MultiPolygon, Point, Polygon, Rect};
 use geo::algorithm::line_intersection::{line_intersection, LineIntersection};
 use geo::algorithm::euclidean_distance::EuclideanDistance;
+use geo::algorithm::map_coords::MapCoords;
+use geo_clipper::{Clipper};
 
 #[cfg(test)]
 mod tests {
+    use anyhow::Error;
     use rstest::rstest;
     use geo::{Coordinate, Line, LineString, Point, Polygon, Rect};
-    use crate::mvt::clip_feature::Clip;
+    use geo::algorithm::translate::Translate;
+    use crate::mvt::clip_feature::{Clip, multipoly_to_rect};
 
     fn box_0_0_to_5_10() -> Rect<f64> {
         Rect::new(
@@ -172,7 +177,67 @@ mod tests {
         let clipped = polygon.clip(&rect);
 
         assert!(clipped.is_some());
-        assert_eq!(clipped.unwrap(),geo::Geometry::Polygon(rect.to_polygon()));
+        let clipped_rect = match clipped {
+            Some(geo::Geometry::MultiPolygon(v)) => multipoly_to_rect(&v),
+            _ => Err(Error::msg("mee"))
+        };
+        assert_eq!(rect, clipped_rect.unwrap());
+        // assert_eq!(clipped.unwrap(), geo::Geometry::MultiPolygon(geo::MultiPolygon(vec![rect.to_polygon()])));
+    }
+
+    #[rstest]
+    #[case (-10.0, -10.0)]
+    #[case (10.0, 10.0)]
+    #[case (0.0, 10.0)]
+    #[case (10.0, 0.0)]
+    fn clip_polygon_thats_outside_the_box_will_return_none(#[case] offset_x: f64, #[case] offset_y: f64) {
+        let rect = box_0_0_to_5_10();
+        // somewhat irregular pentagon
+        let polygon = geo::Geometry::Polygon(Polygon::new(
+            LineString(vec![
+                Coordinate {x: 1.0, y: 1.0},
+                Coordinate {x: 2.0, y: 1.0},
+                Coordinate {x: 3.0, y: 2.0},
+                Coordinate {x: 1.5, y: 3.0},
+                Coordinate {x: 0.0, y: 2.0},
+            ]),
+            vec![],
+        ));
+        let polygon_trans = polygon.translate(offset_x, offset_y);
+
+        let clipped = polygon_trans.clip(&rect);
+
+        assert!(clipped.is_none());
+    }
+
+    #[test]
+    fn clip_poly_thats_partially_in_the_box_will_return_clipped() {
+        let rect = box_0_0_to_5_10();
+        // somewhat irregular pentagon
+        let polygon = geo::Geometry::Polygon(Polygon::new(
+            LineString(vec![
+                Coordinate {x: -5.0, y: -5.0},
+                Coordinate {x: 2.5, y: -5.0},
+                Coordinate {x: 2.5, y: 20.0},
+                Coordinate {x: -5.0, y: 20.0},
+                Coordinate {x: -5.0, y: -5.0},
+            ]),
+            vec![],
+        ));
+
+        let clipped = polygon.clip(&rect);
+
+        assert!(clipped.is_some());
+        let expected = Rect::new(
+            Coordinate {x: 0.0, y: 0.0},
+            Coordinate {x: 2.5, y: 10.0},
+        );
+        let clipped_rect = match clipped {
+            Some(geo::Geometry::MultiPolygon(v)) => multipoly_to_rect(&v),
+            _ => Err(Error::msg("mee"))
+        };
+        assert_eq!(expected, clipped_rect.unwrap());
+
     }
 }
 
@@ -183,13 +248,13 @@ pub trait Clip<T: GeoFloat, Rhs=Self> {
     fn clip(&self, rect: &Rect<T>) ->  Option<Self::Output>;
 }
 
-impl<T: GeoFloat> Clip<T> for Geometry<T> {
+impl<T: GeoFloat + std::convert::From<f64>> Clip<T> for Geometry<T> {
     type Output=Geometry<T>;
     fn clip(&self, rect: &Rect<T>) -> Option<Geometry<T>> {
         match self {
             Geometry::Point(pt) => pt.clip(rect).map(|p| {Geometry::Point(p)}),
             Geometry::Line(l) => l.clip(rect).map(|l| {Geometry::Line(l)}),
-            Geometry::Polygon(pg) => pg.clip(rect).map(|pg| {Geometry::Polygon(pg)}),
+            Geometry::Polygon(pg) => pg.clip(rect).map(|pg| {Geometry::MultiPolygon(pg)}),
             _ => None,
         }
     }
@@ -200,6 +265,31 @@ fn contains<T: GeoFloat>(rect: &Rect<T>, coord: &Coordinate<T>) -> bool {
         && coord.x <= rect.max().x
         && coord.y >= rect.min().y
         && coord.y <= rect.max().y
+}
+
+/// helper function
+fn multipoly_to_rect<T: GeoFloat + std::convert::From<f64>>(multi_polygon: &MultiPolygon<T>) -> anyhow::Result<Rect<T>> {
+    let first_poly: &Polygon<T> = multi_polygon.0.first().ok_or(Error::msg("multipolygon is empty"))?;
+
+    if first_poly.interiors().len() > 0 {
+        Err(Error::msg("poly has interior features"))
+    } else {
+        let exterior = first_poly.exterior();
+        if exterior.0.len() != 5 {
+            Err(Error::msg("polygon is no rectangle"))
+        } else {
+            let c_max: Coordinate<T> = Coordinate {x: 99999999999.9.into(), y: 999999999.9.into()};
+            let min = exterior.0.iter().fold(c_max,|a: Coordinate<T>, b: &Coordinate<T>| {
+                Coordinate {x: a.x.min(b.x), y: a.y.min(b.y) }
+            });
+            let c_min: Coordinate<T> = Coordinate {x: (-99999999999.9).into(), y: (-999999999.9).into()};
+            let max = exterior.0.iter().fold(c_min,|a: Coordinate<T>, b: &Coordinate<T>| {
+                Coordinate { x: a.x.max(b.x), y: a.y.max(b.y) }
+            });
+            Ok(Rect::new(min, max))
+        }
+    }
+
 }
 
 impl<T: GeoFloat> Clip<T> for Line<T> {
@@ -273,10 +363,19 @@ impl<T: GeoFloat> Clip<T> for Point<T> {
     }
 }
 
-impl<T: GeoFloat> Clip<T> for Polygon<T> {
-    type Output = Polygon<T>;
+impl<T: GeoFloat + std::convert::From<f64>> Clip<T> for Polygon<T> {
+    type Output = MultiPolygon<T>;
 
     fn clip(&self, rect: &Rect<T>) -> Option<Self::Output> {
-        Some(rect.clone().to_polygon())
+        let map_f64 = |(a, b): &(T, T)| {(a.to_f64().unwrap(), b.to_f64().unwrap())};
+        let rect_poly = rect.to_polygon().map_coords(map_f64);
+        let clipped = rect_poly.intersection(&self.map_coords(map_f64), 100.0);
+        if clipped.0.is_empty() {
+            None
+        } else {
+            Some(clipped.map_coords(|(a, b)| {
+                ((*a).into(), (*b).into())
+            }))
+        }
     }
 }

@@ -13,6 +13,7 @@ clap = { version = "3.0.9", features = ["cargo"] }
 contour = "0.4.0"
 flate2 = "1.0"
 geo = "0.18"
+geo-clipper = "0.7.1"
 geojson = { version = "0.22", features = ["geo-types"] }
 glob="0.3.0"
 image = "0.23.14"

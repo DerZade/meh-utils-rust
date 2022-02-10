@@ -138,6 +138,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "clipper-sys"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5928e5e0e1a0456c032695cc9b258fc3354d560902a2a32b506afa95360d686e"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "color_quant"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -305,6 +314,16 @@ dependencies = [
  "num-traits",
  "robust",
  "rstar",
+]
+
+[[package]]
+name = "geo-clipper"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ba51b7ade4858658480c45b23c07b76a7ca944057428c5c4673c28da3745973"
+dependencies = [
+ "clipper-sys",
+ "geo-types",
 ]
 
 [[package]]
@@ -497,6 +516,7 @@ dependencies = [
  "contour",
  "flate2",
  "geo",
+ "geo-clipper",
  "geojson",
  "glob",
  "image",
