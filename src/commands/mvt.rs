@@ -3,7 +3,7 @@ use anyhow::{bail, Error};
 use num_traits::cast::ToPrimitive;
 
 use geo::map_coords::MapCoordsInplace;
-use geo::{Coordinate, CoordNum, GeoFloat, Geometry, LineString};
+use geo::{Coordinate, CoordNum, GeoFloat, Geometry, LineString, Rect};
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 
 use crate::dem::{DEMRaster, load_dem};
@@ -12,15 +12,18 @@ use crate::mvt::{load_geo_jsons, build_mounts, find_lod_layers};
 
 use std::collections::HashMap;
 use std::iter::Sum;
+use std::ops::Sub;
 use std::path::{Path, PathBuf};
 
 use std::time::Instant;
 use contour::ContourBuilder;
 use geo::Geometry::Point;
 use geojson::{Feature, PolygonType, Value};
-use mapbox_vector_tile::Tile;
+use mapbox_vector_tile::{Layer, Tile};
 use crate::feature::Feature as CrateFeature;
 use crate::metajson::{MetaJsonParser};
+
+const DEFAULT_EXTENT: u32 = 4096;
 
 #[cfg(test)]
 #[allow(unused_must_use)]
@@ -32,7 +35,7 @@ mod tests {
     use geojson::Feature;
     use geojson::Value::{MultiPolygon};
     use rand::{Rng, thread_rng};
-    use crate::commands::mvt::{build_contours, build_lod_vector_tiles, build_vector_tiles, fill_contour_layers, MapboxVectorTiles, try_from_geojson_feature_for_crate_feature, try_from_geojson_value_for_geo_geometry, vec_f64_to_coordinate_f32};
+    use crate::commands::mvt::{build_contours, build_lod_vector_tiles, build_vector_tiles, create_tile, fill_contour_layers, MapboxVectorTiles, try_from_geojson_feature_for_crate_feature, try_from_geojson_value_for_geo_geometry, vec_f64_to_coordinate_f32};
     use crate::dem::{DEMRaster, Origin};
     use crate::feature::{Feature as CrateFeature, FeatureCollection};
     use crate::metajson::DummyMetaJsonParser;
@@ -278,6 +281,64 @@ mod tests {
             assert!(output_path.join("3").is_dir());
             assert!(!output_path.join("4").is_dir());
         });
+    }
+
+    #[test]
+    fn create_tile_returns_empty_tile_if_no_layers() {
+        let mut collections: HashMap<String, FeatureCollection<f64>> = HashMap::new();
+        let tile_res = create_tile(0, 0, &mut collections);
+
+        assert!(tile_res.is_ok());
+        let tile = tile_res.unwrap();
+
+        assert!(tile.is_empty());
+        assert_eq!(0, tile.layers.len());
+    }
+
+    #[test]
+    fn create_tile_returns_empty_tile_if_one_empty_layer() {
+        let mut collections: HashMap<String, FeatureCollection<f64>> = HashMap::new();
+        collections.insert("foo".to_string(), FeatureCollection(vec![]));
+
+        let tile_res = create_tile(0, 0, &mut collections);
+        assert!(tile_res.is_ok());
+        let tile = tile_res.unwrap();
+        assert_eq!(1, tile.layers.len());
+        let empty_layer = tile.layers.get(0).unwrap();
+        assert!(empty_layer.features.is_empty());
+        assert_eq!("foo".to_string(), empty_layer.name);
+        assert_eq!(4096, empty_layer.extent);
+    }
+
+
+    #[test]
+    fn create_tile_returns_tile_with_features() {
+        let mut collections: HashMap<String, FeatureCollection<f64>> = HashMap::new();
+        let mut foo_features = FeatureCollection(vec![]);
+        let feature_on_tile = geo::Geometry::Point(geo::Point(Coordinate {x: 1.0, y: 1.0}));
+        let feature_off_tile = geo::Geometry::Point(geo::Point(Coordinate {x: 5000.0, y: 5000.0}));
+        foo_features.push(CrateFeature {geometry: feature_on_tile, properties: HashMap::new()});
+        foo_features.push(CrateFeature {geometry: feature_off_tile, properties: HashMap::new()});
+        collections.insert("foo".to_string(), foo_features);
+
+        let tile_res = create_tile(0, 0, &mut collections);
+
+        assert!(tile_res.is_ok());
+
+        let tile = tile_res.unwrap();
+        assert!(!tile.is_empty());
+        let maybe_layer = tile.layers.get(0);
+        assert!(maybe_layer.is_some());
+        let layer = maybe_layer.unwrap();
+        assert_eq!(1, layer.features.len());
+        let feat = layer.features.get(0).unwrap();
+        match feat.geometry {
+            geo::Geometry::Point(geo::Point(c)) => {
+                assert_eq!(c.x, 1);
+                assert_eq!(c.y, 1)
+            },
+            _ => assert!(false)
+        }
     }
 }
 
@@ -555,14 +616,34 @@ fn build_vector_tiles<T: CoordNum + Send + GeoFloat + From<f32> + Sum>(output_pa
     Ok(())
 }
 
-fn create_tile<T: CoordNum>(col: u32, row: u32, collections: &mut HashMap<String, FeatureCollection<T>>) -> anyhow::Result<Tile> {
+fn create_tile<T: CoordNum + std::convert::From<u32>>(col: u32, row: u32, collections: &mut HashMap<String, FeatureCollection<T>>) -> anyhow::Result<Tile> {
     println!("create_tile with col {}, row {}, and {} collections", col, row, collections.len());
 
-    // get offset for this tile
-    // get bounds in orb coordinates (?)
-    // define projection from global coordinates to tile coordinates
+    let offset: Coordinate<T> = Coordinate {
+        x: (col * DEFAULT_EXTENT).into(),
+        y: (row * DEFAULT_EXTENT).into(),
+    };
+    let extent: Coordinate<T> = Coordinate {
+        x: DEFAULT_EXTENT.into(),
+        y: DEFAULT_EXTENT.into(),
+    };
+
+    let tile_border = Rect::new(offset, extent);
+
+    // define projection from global coordinates to tile coordinates. do we need that in this implementation?
+    let glob_to_tile_coords: fn(&Coordinate<T>) -> Coordinate<T> = |c: &Coordinate<T>| {
+        Coordinate::from(c).sub(offset)
+    };
 
     // map feature collections to layer models
+
+    let mut layers: Vec<Layer> = vec![];
+    collections.iter().for_each(|(name, _)| {
+        let layer = Layer::new(name);
+
+        layers.push(layer);
+
+    });
     // for each layer:
         // for each geometry:
             // clone
@@ -571,7 +652,7 @@ fn create_tile<T: CoordNum>(col: u32, row: u32, collections: &mut HashMap<String
         // collect
     // define tile, put layers into it
 
-    Ok(Tile::new())
+    Ok(Tile::from_layers(layers))
 }
 
 fn build_lod_vector_tiles<T: CoordNum>(collections: &mut HashMap<String, FeatureCollection<T>>, world_size: u32, lod: u8, lod_dir: &PathBuf) -> anyhow::Result<()> {
