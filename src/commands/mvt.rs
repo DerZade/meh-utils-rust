@@ -631,8 +631,8 @@ fn create_tile<T: CoordNum + std::convert::From<u32>>(col: u32, row: u32, collec
     let tile_border = Rect::new(offset, extent);
 
     // define projection from global coordinates to tile coordinates. do we need that in this implementation?
-    let glob_to_tile_coords: fn(&Coordinate<T>) -> Coordinate<T> = |c: &Coordinate<T>| {
-        Coordinate::from(c).sub(offset)
+    let glob_to_tile_coords = |c: &Coordinate<T>| {
+        c.sub(offset)
     };
 
     // map feature collections to layer models
@@ -655,7 +655,7 @@ fn create_tile<T: CoordNum + std::convert::From<u32>>(col: u32, row: u32, collec
     Ok(Tile::from_layers(layers))
 }
 
-fn build_lod_vector_tiles<T: CoordNum>(collections: &mut HashMap<String, FeatureCollection<T>>, world_size: u32, lod: u8, lod_dir: &PathBuf) -> anyhow::Result<()> {
+fn build_lod_vector_tiles<T: CoordNum + std::convert::From<u32>>(collections: &mut HashMap<String, FeatureCollection<T>>, world_size: u32, lod: u8, lod_dir: &PathBuf) -> anyhow::Result<()> {
     println!("build_lod_vector_tiles with {} collections, worldsize {} and lod {} into {}", collections.len(), world_size, lod, lod_dir.to_str().unwrap_or("WAT"));
 
     fn ensure_directory(dir: &PathBuf) -> Result<(), Error>{
