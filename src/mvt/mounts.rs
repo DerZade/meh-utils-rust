@@ -4,10 +4,10 @@ use crate::feature::{FeatureCollection, Feature, PropertyValue};
 
 const NEIGHBOUR_CELLS: [(i32, i32); 8] = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)];
 
-pub fn build_mounts(dem: &DEMRaster, elevation_offset: f32, collections: &mut HashMap<String, FeatureCollection<f32>>) -> anyhow::Result<()> {
+pub fn build_mounts(dem: &DEMRaster, elevation_offset: f32, collections: &mut HashMap<String, FeatureCollection>) -> anyhow::Result<()> {
 
     let (w, h) = dem.dimensions();
-    let mut mounts = FeatureCollection::<f32>::new();
+    let mut mounts = FeatureCollection::new();
 
     for col in 1..w-1 {
         for row in 1..h-1 {

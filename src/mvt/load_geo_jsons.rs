@@ -28,9 +28,9 @@ fn find_files_rec(dir: &Path) -> anyhow::Result<Vec<DirEntry>> {
     Ok(files)
 }
 
-pub fn load_geo_jsons(input_path: &Path, collections: &mut HashMap<String, FeatureCollection<f32>>) -> anyhow::Result<()> {
+pub fn load_geo_jsons(input_path: &Path, collections: &mut HashMap<String, FeatureCollection>) -> anyhow::Result<()> {
 
-    let (mut ok_results, mut err_results): (Vec<_>, Vec<_>) = find_files_rec(input_path)?.into_par_iter().map(|entry| -> anyhow::Result<(String, FeatureCollection<f32>)> {
+    let (mut ok_results, mut err_results): (Vec<_>, Vec<_>) = find_files_rec(input_path)?.into_par_iter().map(|entry| -> anyhow::Result<(String, FeatureCollection)> {
         let path_buf = entry.path();
         let path = path_buf.as_path();
         let layer_name = path_to_layer_name(path, input_path)?;
@@ -65,7 +65,7 @@ fn path_to_layer_name (file_path: &Path, input_path: &Path) -> anyhow::Result<St
     Ok(string)
 }
 
-fn read_zipped_geo_json(path: &Path) -> anyhow::Result<FeatureCollection<f32>> {
+fn read_zipped_geo_json(path: &Path) -> anyhow::Result<FeatureCollection> {
     let file = File::open(path)?;
 
     let buf = BufReader::new(file);
@@ -73,7 +73,7 @@ fn read_zipped_geo_json(path: &Path) -> anyhow::Result<FeatureCollection<f32>> {
 
     let mut geojson_features: Vec<geojson::Feature> = serde_json::from_reader(dec)?;
 
-    let fc: FeatureCollection<f32> = geojson_features.drain(0..geojson_features.len()).filter_map(|f|{
+    let fc: FeatureCollection = geojson_features.drain(0..geojson_features.len()).filter_map(|f|{
         if f.geometry.is_none() {
             return None
         }

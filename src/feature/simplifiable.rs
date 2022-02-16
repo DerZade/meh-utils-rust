@@ -4,6 +4,7 @@ use geo::euclidean_length::EuclideanLength;
 use geo::area::Area;
 use geo::simplify::Simplify;
 use crate::feature::{FeatureCollection};
+use crate::mvt::MvtGeoFloatType;
 
 #[cfg(test)]
 mod tests {
@@ -130,8 +131,8 @@ fn simplify_geo<T: GeoFloat>(geometry: &Geometry<T>, epsilon: &T) -> Option<geo:
     }
 }
 
-impl<T: GeoFloat + Sum> Simplifiable<T> for FeatureCollection<T> {
-    fn simplify(&mut self, epsilon: T) {
+impl Simplifiable<MvtGeoFloatType> for FeatureCollection {
+    fn simplify(&mut self, epsilon: MvtGeoFloatType) {
         self.0.iter_mut().for_each(|f| {
             let opt = simplify_geo(&f.geometry, &epsilon);
 
@@ -150,7 +151,7 @@ impl<T: GeoFloat + Sum> Simplifiable<T> for FeatureCollection<T> {
     ///
     /// here the Go implementation, see https://github.com/paulmach/orb/blob/master/encoding/mvt/simplify.go
     ///
-    fn remove_empty(&mut self, line_limit: T, area_limit: T) -> () {
+    fn remove_empty(&mut self, line_limit: MvtGeoFloatType, area_limit: MvtGeoFloatType) -> () {
         for i in (0..self.len()).rev() {
             let f = self.get(i).unwrap();
             let keep = match &f.geometry {

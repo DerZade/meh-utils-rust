@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::iter::Sum;
 use geo::{CoordNum, GeoFloat};
-use crate::feature::FeatureCollection;
+use crate::mvt::FeatureCollection;
 
 #[cfg(test)]
 mod tests {
@@ -10,14 +10,14 @@ mod tests {
     use crate::feature::{Feature, FeatureCollection};
     use crate::mvt::layer_settings::find_lod_layers;
 
-    fn some_feature() -> Feature<f32> {
+    fn some_feature() -> Feature {
         Feature {
             geometry: geo::Geometry::Point(geo::Point(Coordinate {x: 1.0, y: 1.0})),
             properties: HashMap::new(),
         }
     }
 
-    fn collections_with_layers(layer_names: Vec<&str>) -> HashMap<String, FeatureCollection<f32>> {
+    fn collections_with_layers(layer_names: Vec<&str>) -> HashMap<String, FeatureCollection> {
         let mut collections = HashMap::new();
         layer_names.iter().for_each(|layer_name| {
             let collection = FeatureCollection::from_iter(vec![some_feature()]);
@@ -58,7 +58,7 @@ mod tests {
 ///
 /// return layer names
 ///
-pub fn find_lod_layers<T: CoordNum + Send + GeoFloat + From<f32> + Sum>(all_layers: &HashMap<String, FeatureCollection<T>>, _lod: u8) -> Vec<String> {
+pub fn find_lod_layers(all_layers: &HashMap<String, FeatureCollection>, _lod: u8) -> Vec<String> {
     println!("warning: find_lod_layers is currently a well-meaning stub, nothing more!");
 
     all_layers.keys().map(|s| {s.clone()}).filter(|k| {k.ne("contours")}).collect::<Vec<String>>()

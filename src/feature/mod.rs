@@ -4,13 +4,16 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use geo::{map_coords::MapCoordsInplace, map_coords::MapCoords, CoordNum, Geometry};
 use mapbox_vector_tile::{Layer, Properties};
+use num_traits::ToPrimitive;
 pub use simplifiable::Simplifiable;
+use crate::mvt::{MvtGeoFloatType};
 
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
     use geo::{Coordinate, Geometry, Point};
     use mapbox_vector_tile::Layer;
+    use num_traits::ToPrimitive;
     use crate::feature::{Feature, FeatureCollection};
 
     #[test]
@@ -22,7 +25,7 @@ mod tests {
         ];
         features.iter().for_each(|(_, c)| {
             let feature = Feature {
-                geometry: geo::Geometry::Point(geo::Point(c.clone())),
+                geometry: geo::Geometry::Point(geo::Point(Coordinate { x: c.x.to_f32().unwrap(), y: c.y.to_f32().unwrap()})),
                 properties: HashMap::new(),
             };
             feature_collection.push(feature);
@@ -125,14 +128,14 @@ impl PartialEq for PropertyValue {
 }
 
 #[derive(Clone)]
-pub struct Feature<T: CoordNum> {
-    pub geometry: Geometry<T>,
+pub struct Feature {
+    pub geometry: Geometry<MvtGeoFloatType>,
     pub properties: HashMap<String, PropertyValue>
 }
 
-impl<T: CoordNum> Into<mapbox_vector_tile::Feature> for Feature<T> {
+impl Into<mapbox_vector_tile::Feature> for Feature {
     fn into(self) -> mapbox_vector_tile::Feature {
-        let geometry: Geometry<T> = self.geometry.clone();
+        let geometry: Geometry<MvtGeoFloatType> = self.geometry.clone();
         let mut new_properties: Properties = Properties::new();
         self.properties.into_iter().for_each(|(k, v)| {
             new_properties.insert(k.to_string(), v);
@@ -151,29 +154,29 @@ impl<T: CoordNum> Into<mapbox_vector_tile::Feature> for Feature<T> {
 
 
 #[derive(Clone)]
-pub struct FeatureCollection<T: CoordNum>(pub Vec<Feature<T>>);
+pub struct FeatureCollection(pub Vec<Feature>);
 
-impl<T: CoordNum> std::ops::Deref for FeatureCollection<T> {
-    type Target = Vec<Feature<T>>;
-    fn deref(&self) -> &Vec<Feature<T>> {
+impl std::ops::Deref for FeatureCollection {
+    type Target = Vec<Feature>;
+    fn deref(&self) -> &Vec<Feature> {
         &self.0
     }
 }
 
-impl<T: CoordNum> std::ops::DerefMut for FeatureCollection<T> {
-    fn deref_mut(&mut self) -> &mut Vec<Feature<T>> {
+impl std::ops::DerefMut for FeatureCollection {
+    fn deref_mut(&mut self) -> &mut Vec<Feature> {
         &mut self.0
     }
 }
 
-impl<T: CoordNum> MapCoordsInplace<T> for Feature<T> {
-    fn map_coords_inplace(&mut self, func: impl Fn(&(T, T)) -> (T, T) + Copy) {
+impl MapCoordsInplace<MvtGeoFloatType> for Feature {
+    fn map_coords_inplace(&mut self, func: impl Fn(&(MvtGeoFloatType, MvtGeoFloatType)) -> (MvtGeoFloatType, MvtGeoFloatType) + Copy) {
         self.geometry.map_coords_inplace(func);
     }
 }
 
-impl<T: CoordNum> FromIterator<Feature<T>> for FeatureCollection<T> {
-    fn from_iter<I: IntoIterator<Item = Feature<T>>>(iter: I) -> Self {
+impl FromIterator<Feature> for FeatureCollection {
+    fn from_iter<I: IntoIterator<Item = Feature>>(iter: I) -> Self {
         let mut c = Self::new();
 
         for i in iter {
@@ -184,17 +187,17 @@ impl<T: CoordNum> FromIterator<Feature<T>> for FeatureCollection<T> {
     }
 }
 
-impl<T: CoordNum> MapCoordsInplace<T> for FeatureCollection<T> {
-    fn map_coords_inplace(&mut self, func: impl Fn(&(T, T)) -> (T, T) + Copy) {
+impl MapCoordsInplace<MvtGeoFloatType> for FeatureCollection {
+    fn map_coords_inplace(&mut self, func: impl Fn(&(MvtGeoFloatType, MvtGeoFloatType)) -> (MvtGeoFloatType, MvtGeoFloatType) + Copy) {
         for f in self.iter_mut() {
             f.map_coords_inplace(func);
         }
     }
 }
 
-impl<T: CoordNum> FeatureCollection<T> {
+impl FeatureCollection {
     pub fn new() -> Self {
-        FeatureCollection(Vec::<Feature<T>>::new())
+        FeatureCollection(Vec::<Feature>::new())
     }
     pub fn to_layer(self, name: String) -> Layer {
         let mut layer = Layer::new(name);

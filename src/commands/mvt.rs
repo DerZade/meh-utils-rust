@@ -8,7 +8,7 @@ use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 
 use crate::dem::{DEMRaster, load_dem};
 use crate::feature::{FeatureCollection, Simplifiable};
-use crate::mvt::{load_geo_jsons, build_mounts, find_lod_layers};
+use crate::mvt::{load_geo_jsons, build_mounts, find_lod_layers, MvtGeoFloatType};
 
 use std::collections::HashMap;
 use std::iter::Sum;
@@ -23,7 +23,7 @@ use mapbox_vector_tile::{Layer, Tile};
 use crate::feature::Feature as CrateFeature;
 use crate::metajson::{MetaJsonParser};
 
-const DEFAULT_EXTENT: u32 = 4096;
+const DEFAULT_EXTENT: u16 = 4096;
 
 #[cfg(test)]
 #[allow(unused_must_use)]
@@ -61,7 +61,7 @@ mod tests {
 
     #[test]
     fn build_contours_does_its_thing() {
-        let contour_line_to_vec_of_tuple = |feature: &CrateFeature<f32>| -> Vec<(f32, f32)> {
+        let contour_line_to_vec_of_tuple = |feature: &CrateFeature| -> Vec<(f32, f32)> {
             match &feature.geometry {
                 geo::Geometry::MultiPolygon(foo) => {
                     let poly = foo.0.get(0).unwrap();
@@ -80,14 +80,14 @@ mod tests {
             1.0, 7.0, 5.0, 3.0, 0.0,
             0.0, 1.0, 1.0, 1.0, 0.0,
         ]);
-        let mut collections: HashMap<String, crate::feature::FeatureCollection<f32>> = HashMap::new();
+        let mut collections: HashMap<String, FeatureCollection> = HashMap::new();
 
         let res = build_contours(&raster, 0.0, 2048, 2, &mut collections);
 
         assert!(res.is_ok());
         assert_eq!(collections.len(), 1);
         assert!(collections.contains_key("contour_lines"));
-        let contour_lines: &FeatureCollection<f32> = collections.get("contour_lines").unwrap();
+        let contour_lines: &FeatureCollection = collections.get("contour_lines").unwrap();
         assert_eq!(contour_lines.len(), 5);
         println!("ookay collection: {}", collections.get("contour_lines").unwrap().0.len());
 
@@ -156,7 +156,7 @@ mod tests {
             foreign_members: None,
         };
 
-        let cratefeature: anyhow::Result<CrateFeature<f32>> = try_from_geojson_feature_for_crate_feature(geojsonfeature);
+        let cratefeature: anyhow::Result<CrateFeature> = try_from_geojson_feature_for_crate_feature(geojsonfeature);
 
         assert!(cratefeature.is_ok());
         match cratefeature.unwrap().geometry {
@@ -191,7 +191,7 @@ mod tests {
     #[test]
     fn build_vector_tiles_does_not_explode_on_0_lods() {
         with_input_and_output_paths(|_, output_path| {
-            let res = build_vector_tiles(&output_path, HashMap::<String, FeatureCollection<f32>>::new(), 0, 1);
+            let res = build_vector_tiles(&output_path, HashMap::<String, FeatureCollection>::new(), 0, 1);
 
             assert!(res.is_ok());
         });
@@ -200,13 +200,13 @@ mod tests {
     #[test]
     fn build_vector_tiles_does_not_explode_on_empty_input() {
         with_input_and_output_paths(|_, output_path| {
-            let res = build_vector_tiles(&output_path, HashMap::<String, FeatureCollection<f32>>::new(), 1, 1);
+            let res = build_vector_tiles(&output_path, HashMap::<String, FeatureCollection>::new(), 1, 1);
 
             assert!(res.is_ok());
         });
     }
 
-    fn some_feature() -> CrateFeature<f32> {
+    fn some_feature() -> CrateFeature {
         let mut rng = thread_rng();
         let mut rand = || {rng.gen_range(0.0..127.0)};
         CrateFeature {
@@ -215,7 +215,7 @@ mod tests {
         }
     }
 
-    fn collections_with_layers(layer_names: Vec<&str>/*, add_features: bool*/) -> HashMap<String, FeatureCollection<f32>> {
+    fn collections_with_layers(layer_names: Vec<&str>/*, add_features: bool*/) -> HashMap<String, FeatureCollection> {
         let mut collections = HashMap::new();
         layer_names.iter().for_each(|layer_name| {
             let collection = FeatureCollection::from_iter(vec![]);
@@ -227,7 +227,7 @@ mod tests {
 
     #[test]
     fn fill_contour_layers_does_not_panic_if_no_contours_but_returns_err() {
-        let mut layers = HashMap::<String, FeatureCollection<f32>>::new();
+        let mut layers = HashMap::<String, FeatureCollection>::new();
         let res = fill_contour_layers(vec!["foo".to_string(), "contours/1".to_string()], &mut layers);
 
         assert!(res.is_err());
@@ -285,7 +285,7 @@ mod tests {
 
     #[test]
     fn create_tile_returns_empty_tile_if_no_layers() {
-        let mut collections: HashMap<String, FeatureCollection<f64>> = HashMap::new();
+        let mut collections: HashMap<String, FeatureCollection> = HashMap::new();
         let tile_res = create_tile(0, 0, &mut collections);
 
         assert!(tile_res.is_ok());
@@ -297,7 +297,7 @@ mod tests {
 
     #[test]
     fn create_tile_returns_empty_tile_if_one_empty_layer() {
-        let mut collections: HashMap<String, FeatureCollection<f64>> = HashMap::new();
+        let mut collections: HashMap<String, FeatureCollection> = HashMap::new();
         collections.insert("foo".to_string(), FeatureCollection(vec![]));
 
         let tile_res = create_tile(0, 0, &mut collections);
@@ -313,7 +313,7 @@ mod tests {
 
     #[test]
     fn create_tile_returns_tile_with_features() {
-        let mut collections: HashMap<String, FeatureCollection<f64>> = HashMap::new();
+        let mut collections: HashMap<String, FeatureCollection> = HashMap::new();
         let mut foo_features = FeatureCollection(vec![]);
         let feature_on_tile = geo::Geometry::Point(geo::Point(Coordinate {x: 1.0, y: 1.0}));
         let feature_off_tile = geo::Geometry::Point(geo::Point(Coordinate {x: 5000.0, y: 5000.0}));
@@ -342,7 +342,7 @@ mod tests {
     }
 }
 
-pub fn try_from_geojson_feature_for_crate_feature(value: Feature) -> anyhow::Result<CrateFeature<f32>> {
+pub fn try_from_geojson_feature_for_crate_feature(value: Feature) -> anyhow::Result<CrateFeature> {
     match value.geometry {
         Some(g) => {
             try_from_geojson_value_for_geo_geometry(g.value).map(|geo| {
@@ -410,7 +410,7 @@ impl MapboxVectorTiles {
     }
 
     pub fn exec(&self, input_path: &Path, output_path: &Path) -> anyhow::Result<()> {
-        let mut collections: HashMap<String, FeatureCollection<f32>> = HashMap::new();
+        let mut collections: HashMap<String, FeatureCollection> = HashMap::new();
 
         let start = Instant::now();
 
@@ -488,7 +488,7 @@ fn calc_max_lod (_world_size: u32) -> u8 {
 
 
 
-fn build_contours(dem: &DEMRaster, elevation_offset: f32, _: u32, step: usize, collections: &mut HashMap<String, FeatureCollection<f32>>) -> anyhow::Result<()> {
+fn build_contours(dem: &DEMRaster, elevation_offset: f32, _: u32, step: usize, collections: &mut HashMap<String, FeatureCollection>) -> anyhow::Result<()> {
     let cmp = |a: &&f64, b: &&f64| -> Ordering {a.partial_cmp(b).unwrap()};
 
     let elevation_offset_f64 = elevation_offset.to_f64().unwrap();
@@ -519,7 +519,7 @@ fn build_contours(dem: &DEMRaster, elevation_offset: f32, _: u32, step: usize, c
 
             })
         */
-        let foo: Vec<CrateFeature<f32>> = features.into_iter().filter_map(|f| {
+        let foo: Vec<CrateFeature> = features.into_iter().filter_map(|f| {
             try_from_geojson_feature_for_crate_feature(f).ok()
         }).collect();
 
@@ -536,17 +536,17 @@ fn build_contours(dem: &DEMRaster, elevation_offset: f32, _: u32, step: usize, c
 
 const TILE_SIZE: u64 = 4096;
 
-fn build_vector_tiles<T: CoordNum + Send + GeoFloat + From<f32> + Sum>(output_path: &Path, mut collections: HashMap<String, FeatureCollection<T>>, max_lod: u8, world_size: u32) -> anyhow::Result<()> {
+fn build_vector_tiles(output_path: &Path, mut collections: HashMap<String, FeatureCollection>, max_lod: u8, world_size: u32) -> anyhow::Result<()> {
 
     let world_size_f32 = world_size as f32;
     let tiles_per_col_row = 2_u32.pow(max_lod as u32);
     let pixels = tiles_per_col_row as u64 * TILE_SIZE;
     let factor = pixels as f32 / world_size_f32;
 
-    let factor_t: T = factor.into();
-    let world_size_t: T = world_size_f32.into();
+    let factor_t: MvtGeoFloatType = factor.into();
+    let world_size_t: MvtGeoFloatType = world_size_f32.into();
 
-    project_layers_in_place(&mut collections, |(x, y)| {
+    project_layers_in_place(&mut collections, |(x, y): &(MvtGeoFloatType, MvtGeoFloatType)| {
         (
             *x * factor_t,
             (world_size_t - *y) * factor_t,
@@ -559,7 +559,7 @@ fn build_vector_tiles<T: CoordNum + Send + GeoFloat + From<f32> + Sum>(output_pa
 
 		// project from last LOD to this LOD
         if lod != max_lod {
-            project_layers_in_place(&mut collections, |(x, y)| (*x / 2.0.into(), *y / 2.0.into()));
+            project_layers_in_place(&mut collections, |(x, y): &(MvtGeoFloatType, MvtGeoFloatType)| ((x / 2.0).into(), (y / 2.0).into()));
         }
 
 		// simplify layers
@@ -616,14 +616,14 @@ fn build_vector_tiles<T: CoordNum + Send + GeoFloat + From<f32> + Sum>(output_pa
     Ok(())
 }
 
-fn create_tile<T: CoordNum + std::convert::From<u32>>(col: u32, row: u32, collections: &mut HashMap<String, FeatureCollection<T>>) -> anyhow::Result<Tile> {
+fn create_tile(col: u16, row: u16, collections: &mut HashMap<String, FeatureCollection>) -> anyhow::Result<Tile> {
     println!("create_tile with col {}, row {}, and {} collections", col, row, collections.len());
 
-    let offset: Coordinate<T> = Coordinate {
+    let offset: Coordinate<MvtGeoFloatType> = Coordinate {
         x: (col * DEFAULT_EXTENT).into(),
         y: (row * DEFAULT_EXTENT).into(),
     };
-    let extent: Coordinate<T> = Coordinate {
+    let extent: Coordinate<MvtGeoFloatType> = Coordinate {
         x: DEFAULT_EXTENT.into(),
         y: DEFAULT_EXTENT.into(),
     };
@@ -631,7 +631,7 @@ fn create_tile<T: CoordNum + std::convert::From<u32>>(col: u32, row: u32, collec
     let tile_border = Rect::new(offset, extent);
 
     // define projection from global coordinates to tile coordinates. do we need that in this implementation?
-    let glob_to_tile_coords = |c: &Coordinate<T>| {
+    let glob_to_tile_coords = |c: &Coordinate<MvtGeoFloatType>| {
         c.sub(offset)
     };
 
@@ -655,7 +655,7 @@ fn create_tile<T: CoordNum + std::convert::From<u32>>(col: u32, row: u32, collec
     Ok(Tile::from_layers(layers))
 }
 
-fn build_lod_vector_tiles<T: CoordNum + std::convert::From<u32>>(collections: &mut HashMap<String, FeatureCollection<T>>, world_size: u32, lod: u8, lod_dir: &PathBuf) -> anyhow::Result<()> {
+fn build_lod_vector_tiles(collections: &mut HashMap<String, FeatureCollection>, world_size: u32, lod: u8, lod_dir: &PathBuf) -> anyhow::Result<()> {
     println!("build_lod_vector_tiles with {} collections, worldsize {} and lod {} into {}", collections.len(), world_size, lod, lod_dir.to_str().unwrap_or("WAT"));
 
     fn ensure_directory(dir: &PathBuf) -> Result<(), Error>{
@@ -666,7 +666,7 @@ fn build_lod_vector_tiles<T: CoordNum + std::convert::From<u32>>(collections: &m
         }
     }
 
-    let tiles_per_dimension: u32 = (2 as u32).pow(lod as u32);
+    let tiles_per_dimension: u16 = (2 as u16).pow(lod as u32);
 
     for col in 0..tiles_per_dimension {
         let col_path= lod_dir.join(PathBuf::from(col.to_string()));
@@ -686,7 +686,7 @@ fn build_lod_vector_tiles<T: CoordNum + std::convert::From<u32>>(collections: &m
 /// there are layers matching `^contours/(\d+)$` . Matching group denotes contour line interval.
 /// Example: contours/10 is supposed to contain contour lines in 10m intervals.
 /// This function fills the `^contours/\d+$` layers selectively with features from "contours" layer.
-fn fill_contour_layers<T: CoordNum>(lod_layer_names: Vec<String>, collections: &mut HashMap<String, FeatureCollection<T>>) -> anyhow::Result<()> {
+fn fill_contour_layers(lod_layer_names: Vec<String>, collections: &mut HashMap<String, FeatureCollection>) -> anyhow::Result<()> {
     let contour_features = collections.get_mut("contours").ok_or(anyhow::Error::msg("foo"))?.clone();
     let contours_names: Vec<(String, usize)> = lod_layer_names.iter().map(|name| {
         let x = name.strip_prefix("contours/");
@@ -708,12 +708,12 @@ fn fill_contour_layers<T: CoordNum>(lod_layer_names: Vec<String>, collections: &
     Ok(())
 }
 
-fn project_layers_in_place<T: CoordNum, F: Fn(&(T, T)) -> (T, T) + Copy>(layers: &mut HashMap<String, FeatureCollection<T>>, transform: F) {
+fn project_layers_in_place<F: Fn(&(MvtGeoFloatType, MvtGeoFloatType)) -> (MvtGeoFloatType, MvtGeoFloatType) + Copy>(layers: &mut HashMap<String, FeatureCollection>, transform: F) {
     for (_, layer) in layers.iter_mut() {
         layer.map_coords_inplace(transform);
     }
 }
 
-fn simplify_mounts<T: CoordNum>(_: &mut FeatureCollection<T>, _: f64) {
+fn simplify_mounts(_: &mut FeatureCollection, _: f64) {
     todo!("mount simplification");
 }

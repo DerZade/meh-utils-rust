@@ -14,6 +14,8 @@ use crate::commands::sat::Sat;
 use crate::commands::terrain_rgb::TerrainRGB;
 use crate::SerdeMetaJsonParser;
 
+
+
 pub trait ClapCommand {
     fn get_identifier(&self) -> &str;
     fn register(&self) -> App;
