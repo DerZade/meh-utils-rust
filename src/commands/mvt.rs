@@ -2,24 +2,25 @@ use std::cmp::Ordering;
 use anyhow::{bail, Error};
 use num_traits::cast::ToPrimitive;
 
-use geo::map_coords::MapCoordsInplace;
+use geo::map_coords::{MapCoords, MapCoordsInplace};
 use geo::{Coordinate, CoordNum, GeoFloat, Geometry, LineString, Rect};
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 
 use crate::dem::{DEMRaster, load_dem};
 use crate::feature::{FeatureCollection, Simplifiable};
-use crate::mvt::{load_geo_jsons, build_mounts, find_lod_layers, MvtGeoFloatType};
+use crate::mvt::{load_geo_jsons, build_mounts, find_lod_layers, MvtGeoFloatType, Clip};
 
 use std::collections::HashMap;
 use std::iter::Sum;
 use std::ops::Sub;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 
 use std::time::Instant;
 use contour::ContourBuilder;
 use geo::Geometry::Point;
 use geojson::{Feature, PolygonType, Value};
-use mapbox_vector_tile::{Layer, Tile};
+use mapbox_vector_tile::{Layer, Properties, Tile};
 use crate::feature::Feature as CrateFeature;
 use crate::metajson::{MetaJsonParser};
 
@@ -638,8 +639,16 @@ fn create_tile(col: u16, row: u16, collections: &mut HashMap<String, FeatureColl
     // map feature collections to layer models
 
     let mut layers: Vec<Layer> = vec![];
-    collections.iter().for_each(|(name, _)| {
-        let layer = Layer::new(name);
+    collections.iter().for_each(|(name, features)| {
+        let mut layer = Layer::new(name);
+        features.iter().filter_map(|f| {
+            f.geometry.clip(&tile_border)
+        }).for_each(|f| {
+            layer.add_feature(mapbox_vector_tile::Feature {
+                geometry: f.map_coords(|(x,y)| {(x.to_i32().unwrap(), y.to_i32().unwrap())}),
+                properties: Rc::new(Properties::new()), // TODO
+            })
+        });
 
         layers.push(layer);
 

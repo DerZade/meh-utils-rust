@@ -248,7 +248,7 @@ pub trait Clip<T: GeoFloat, Rhs=Self> {
     fn clip(&self, rect: &Rect<T>) ->  Option<Self::Output>;
 }
 
-impl<T: GeoFloat + std::convert::From<f64>> Clip<T> for Geometry<T> {
+impl<T: GeoFloat + std::convert::From<f32>> Clip<T> for Geometry<T> {
     type Output=Geometry<T>;
     fn clip(&self, rect: &Rect<T>) -> Option<Geometry<T>> {
         match self {
@@ -268,7 +268,7 @@ fn contains<T: GeoFloat>(rect: &Rect<T>, coord: &Coordinate<T>) -> bool {
 }
 
 /// helper function
-fn multipoly_to_rect<T: GeoFloat + std::convert::From<f64>>(multi_polygon: &MultiPolygon<T>) -> anyhow::Result<Rect<T>> {
+fn multipoly_to_rect<T: GeoFloat + std::convert::From<f32>>(multi_polygon: &MultiPolygon<T>) -> anyhow::Result<Rect<T>> {
     let first_poly: &Polygon<T> = multi_polygon.0.first().ok_or(Error::msg("multipolygon is empty"))?;
 
     if first_poly.interiors().len() > 0 {
