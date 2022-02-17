@@ -1,12 +1,54 @@
 use serde::Serialize;
 
 use std::{collections::HashMap, fs::File, path::Path};
-
 use serde_json::to_string_pretty;
-
 use std::io::{Error, Write};
-
 use crate::metajson::MetaJSON;
+
+#[cfg(test)]
+mod tests {
+    use std::fs::{read_to_string};
+    use crate::metajson::MetaJSON;
+    use crate::test::with_input_and_output_paths;
+    use crate::tilejson::write;
+
+    #[test]
+    #[allow(unused_must_use)]
+    fn tile_json_gets_written_correctly() {
+        with_input_and_output_paths(|_, output_path| {
+            let res = write(
+                &output_path,
+                5,
+                MetaJSON {
+                    author: "author".to_string(),
+                    display_name: "display_name".to_string(),
+                    elevation_offset: 0.0,
+                    grid_offset_x: 1.0,
+                    grid_offset_y: 2.0,
+                    grids: vec![],
+                    latitude: 3.0,
+                    longitude: 4.0,
+                    color_outside: None,
+                    version: 5.0,
+                    world_name: "world_name".to_string(),
+                    world_size: 6,
+                },
+                "type_display_name",
+                &Vec::new()
+            );
+
+            assert!(res.is_ok());
+
+            let written = read_to_string(output_path.join("tile.json"));
+            assert![written.is_ok()];
+            let str = written.unwrap();
+
+            assert!(str.contains("\"minzoom\""));
+            assert!(str.contains("\"maxzoom\""));
+            assert!(str.contains("\"vector_layers\""));
+        });
+    }
+}
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -17,7 +59,7 @@ pub struct TileJSONLayer {
 }
 
 #[derive(Debug, Serialize)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename = "snake_case")]
 #[allow(dead_code)]
 /// https://github.com/mapbox/tilejson-spec
 pub struct TileJSON {
@@ -27,8 +69,6 @@ pub struct TileJSON {
     pub scheme: String,
     pub minzoom: u8,
     pub maxzoom: u8,
-
-    #[serde(rename = "snake_case")]
     pub vector_layers: Option<Vec<TileJSONLayer>>,
 }
 
