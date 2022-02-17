@@ -19,13 +19,14 @@ pub struct TileJSONLayer {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "lowercase")]
 #[allow(dead_code)]
+/// https://github.com/mapbox/tilejson-spec
 pub struct TileJSON {
-    pub tile_json: String,
+    pub tilejson: String,
     pub name: String,
     pub description: String,
     pub scheme: String,
-    pub min_zoom: u8,
-    pub max_zoom: u8,
+    pub minzoom: u8,
+    pub maxzoom: u8,
 
     #[serde(rename = "snake_case")]
     pub vector_layers: Option<Vec<TileJSONLayer>>,
@@ -49,15 +50,15 @@ pub fn write(
         .collect();
 
     let tile_json = TileJSON {
-        tile_json: String::from("2.2.0"),
+        tilejson: String::from("2.2.0"),
         name: format!("{} {} Tiles", meta.display_name, type_display_name),
         description: format!(
             "{} Tiles of the Arma 3 Map '{}' from {}",
             type_display_name, meta.display_name, meta.author
         ),
         scheme: String::from("xyz"),
-        min_zoom: 0,
-        max_zoom: max_lod,
+        minzoom: 0,
+        maxzoom: max_lod,
         vector_layers: Some(vector_layers),
     };
 
