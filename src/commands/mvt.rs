@@ -430,10 +430,11 @@ impl MapboxVectorTiles {
 
         let start = Instant::now();
 
+        let now = Instant::now();
         println!("▶️  Loading meta.json");
         let meta_path = input_path.join("meta.json");
         let meta = self.meta_json.parse(&meta_path)?;
-        println!("✔️  Loaded meta.json");
+        println!("✔️  Loaded meta.json in {}μs", now.elapsed().as_micros());
 
         // load DEM
         let now = Instant::now();
@@ -443,19 +444,19 @@ impl MapboxVectorTiles {
             bail!("Couldn't find dem.asc.gz");
         }
         let dem: DEMRaster = load_dem(&dem_path)?;
-        println!("✔️  Loaded DEM in {}ms", now.elapsed().as_millis());
+        println!("✔️  Loaded DEM in {}μs", now.elapsed().as_micros());
 
         // contour lines
         let now = Instant::now();
         println!("▶️  Building contour lines");
         build_contours(&dem, meta.elevation_offset, meta.world_size, 10, &mut collections)?;
-        println!("✔️  Built contour lines in {}", now.elapsed().as_millis());
+        println!("✔️  Built contour lines in {}μs", now.elapsed().as_micros());
 
         // build mounts
         let now = Instant::now();
         println!("▶️  Building mounts");
         build_mounts(&dem, meta.elevation_offset, &mut collections)?;
-        println!("✔️  Built mounts in {}", now.elapsed().as_millis());
+        println!("✔️  Built mounts in {}μs", now.elapsed().as_micros());
 
         // loading GeoJSONSs
         let now = Instant::now();
@@ -463,8 +464,8 @@ impl MapboxVectorTiles {
         let geo_json_path = input_path.join("geojson");
         load_geo_jsons(&geo_json_path, &mut collections)?;
         println!(
-            "✔️  Loaded layers from geojsons in {}",
-            now.elapsed().as_millis()
+            "✔️  Loaded layers from geojsons in {}μs",
+            now.elapsed().as_micros()
         );
 
         // print loaded layers
@@ -480,17 +481,17 @@ impl MapboxVectorTiles {
         println!("▶️  Building mapbox vector tiles");
         build_vector_tiles(&output_path, collections, max_lod, meta.world_size)?;
         println!(
-            "✔️  Built mapbox vector tiles in {}",
-            now.elapsed().as_millis()
+            "✔️  Built mapbox vector tiles in {}μs",
+            now.elapsed().as_micros()
         );
 
         // tile.json
         let now = Instant::now();
         println!("▶️  Creating tile.json");
         crate::tilejson::write(output_path, max_lod, meta, "Mapbox Vector", &layer_names)?;
-        println!("✔️  Created tile.json in {}ms", now.elapsed().as_millis());
+        println!("✔️  Created tile.json in {}μs", now.elapsed().as_micros());
 
-        println!("\n    🎉  Finished in {}ms", start.elapsed().as_millis());
+        println!("\n    🎉  Finished in {}μs", start.elapsed().as_micros());
 
         Ok(())
     }
@@ -633,7 +634,7 @@ fn build_vector_tiles(output_path: &Path, mut collections: HashMap<String, Featu
 }
 
 fn create_tile(col: u16, row: u16, collections: &mut HashMap<String, FeatureCollection>) -> anyhow::Result<Tile> {
-    println!("create_tile with col {}, row {}, and {} collections", col, row, collections.len());
+    //println!("create_tile with col {}, row {}, and {} collections", col, row, collections.len());
 
     let offset: Coordinate<MvtGeoFloatType> = Coordinate {
         x: (col as f32 * DEFAULT_EXTENT as f32).into(),
