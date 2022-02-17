@@ -35,6 +35,7 @@ mod tests {
     use geojson::Value::{MultiPolygon};
     use mapbox_vector_tile::Tile;
     use rand::{Rng, thread_rng};
+    use rstest::rstest;
     use crate::commands::mvt::{build_contours, build_lod_vector_tiles, build_vector_tiles, create_tile, fill_contour_layers, MapboxVectorTiles, try_from_geojson_feature_for_crate_feature, try_from_geojson_value_for_geo_geometry, vec_f64_to_coordinate_f32};
     use crate::dem::{DEMRaster, Origin};
     use crate::feature::{Feature as CrateFeature, FeatureCollection};
@@ -233,17 +234,19 @@ mod tests {
         assert!(res.is_err());
     }
 
-    #[test]
-    fn fill_contour_layers_copies_all_features_from_contours_to_contours_1() {
-        let mut layers = collections_with_layers(vec!["contours", "contours/1", "foo"]);
+    #[rstest]
+    #[case("contours")]
+    #[case("contour_lines")]
+    fn fill_contour_layers_copies_all_features_from_contours_to_contours_1(#[case] contours_layer_name: &str) {
+        let mut layers = collections_with_layers(vec![contours_layer_name, "contours/1", "foo"]);
         layers.get_mut("foo").unwrap().push(some_feature());
-        layers.get_mut("contours").unwrap().push(some_feature());
-        layers.get_mut("contours").unwrap().push(some_feature());
+        layers.get_mut(contours_layer_name).unwrap().push(some_feature());
+        layers.get_mut(contours_layer_name).unwrap().push(some_feature());
 
         fill_contour_layers(layers.keys().map(|f| {f.to_string()}).collect(), &mut layers);
 
         let contours_1_features = &layers.get("contours/1").unwrap().0;
-        let contours_features = &layers.get("contours").unwrap().0;
+        let contours_features = &layers.get(contours_layer_name).unwrap().0;
         assert_eq!(2, contours_1_features.len());
         for i in 0..=1 {
             assert_eq!(contours_features.get(i).unwrap().geometry, contours_1_features.get(i).unwrap().geometry);
@@ -690,8 +693,11 @@ fn build_lod_vector_tiles(collections: &mut HashMap<String, FeatureCollection>, 
 /// This function fills the `^contours/\d+$` layers selectively with features from "contours" layer.
 fn fill_contour_layers(lod_layer_names: Vec<String>, collections: &mut HashMap<String, FeatureCollection>) -> anyhow::Result<()> {
     // TODO establish if it should be "contours" or "contour_lines"
-    let contour_layer_a = collections.get_mut("contours");
-    // let contour_layer_b = collections.get_mut("contour_lines");
+    let mut contour_layer_a = collections.get_mut("contours");
+    if contour_layer_a.is_none() {
+        contour_layer_a = collections.get_mut("contour_lines")
+    }
+
     let contour_features: FeatureCollection = contour_layer_a
         //.or_else(||{contour_layer_b})
         .ok_or(anyhow::Error::msg("could not find 'contours' or 'contour_lines' layer"))?
