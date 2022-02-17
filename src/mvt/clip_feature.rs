@@ -11,7 +11,7 @@ mod tests {
     use rstest::rstest;
     use geo::{Coordinate, Line, LineString, MultiPolygon, Point, Polygon, Rect};
     use geo::algorithm::translate::Translate;
-    use crate::mvt::clip_feature::{Clip, ClipFloat, multipoly_to_rect};
+    use crate::mvt::clip_feature::{Clip, ClipFloat};
 
     fn multipoly_to_rect<T: ClipFloat>(multi_polygon: &MultiPolygon<T>) -> anyhow::Result<Rect<T>> {
         let first_poly: &Polygon<T> = multi_polygon.0.first().ok_or(Error::msg("multipolygon is empty"))?;

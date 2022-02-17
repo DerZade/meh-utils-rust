@@ -273,13 +273,16 @@ mod tests {
         with_input_and_output_paths(|_, output_path| {
             let mut layers = collections_with_layers(vec!["bar"]);
 
-            let res = build_lod_vector_tiles(&mut layers, 4096, 2, &output_path);
+            let lod_path = output_path.join("11");
+            let res = build_lod_vector_tiles(&mut layers, 4096, 2, &lod_path);
 
             assert!(res.is_ok());
             assert!(output_path.is_dir());
-            assert!(output_path.join("0").is_dir());
-            assert!(output_path.join("3").is_dir());
-            assert!(!output_path.join("4").is_dir());
+            assert!(lod_path.is_dir());
+
+            assert!(lod_path.join("0").is_dir());
+            assert!(lod_path.join("3").is_dir());
+            assert!(!lod_path.join("4").is_dir());
         });
     }
 
@@ -633,8 +636,8 @@ fn create_tile(col: u16, row: u16, collections: &mut HashMap<String, FeatureColl
     println!("create_tile with col {}, row {}, and {} collections", col, row, collections.len());
 
     let offset: Coordinate<MvtGeoFloatType> = Coordinate {
-        x: (col * DEFAULT_EXTENT).into(),
-        y: (row * DEFAULT_EXTENT).into(),
+        x: (col as f32 * DEFAULT_EXTENT as f32).into(),
+        y: (row as f32 * DEFAULT_EXTENT as f32).into(),
     };
     let extent: Coordinate<MvtGeoFloatType> = Coordinate {
         x: DEFAULT_EXTENT.into(),
@@ -663,6 +666,8 @@ fn build_lod_vector_tiles(collections: &mut HashMap<String, FeatureCollection>, 
     }
 
     let tiles_per_dimension: u16 = (2 as u16).pow(lod as u32);
+
+    ensure_directory(&lod_dir)?;
 
     for col in 0..tiles_per_dimension {
         let col_path= lod_dir.join(PathBuf::from(col.to_string()));

@@ -57,7 +57,7 @@ mod tests {
 /// return layer names
 ///
 pub fn find_lod_layers(all_layers: &HashMap<String, FeatureCollection>, _lod: u8) -> Vec<String> {
-    println!("warning: find_lod_layers is currently a well-meaning stub, nothing more!");
+    println!("WARNING: find_lod_layers is currently a well-meaning stub that just returns everything!");
 
     all_layers.keys().map(|s| {s.clone()}).filter(|k| {k.ne("contours")}).collect::<Vec<String>>()
 }
