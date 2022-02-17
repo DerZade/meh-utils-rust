@@ -1,4 +1,3 @@
-use anyhow::Error;
 use geo::{Coordinate, GeoFloat, Geometry, Line, MultiPolygon, Point, Polygon, Rect};
 use geo::algorithm::line_intersection::{line_intersection, LineIntersection};
 use geo::algorithm::euclidean_distance::EuclideanDistance;
@@ -10,9 +9,33 @@ use num_traits::ToPrimitive;
 mod tests {
     use anyhow::Error;
     use rstest::rstest;
-    use geo::{Coordinate, Line, LineString, Point, Polygon, Rect};
+    use geo::{Coordinate, Line, LineString, MultiPolygon, Point, Polygon, Rect};
     use geo::algorithm::translate::Translate;
-    use crate::mvt::clip_feature::{Clip, multipoly_to_rect};
+    use crate::mvt::clip_feature::{Clip, ClipFloat, multipoly_to_rect};
+
+    fn multipoly_to_rect<T: ClipFloat>(multi_polygon: &MultiPolygon<T>) -> anyhow::Result<Rect<T>> {
+        let first_poly: &Polygon<T> = multi_polygon.0.first().ok_or(Error::msg("multipolygon is empty"))?;
+
+        if first_poly.interiors().len() > 0 {
+            Err(Error::msg("poly has interior features"))
+        } else {
+            let exterior = first_poly.exterior();
+            if exterior.0.len() != 5 {
+                Err(Error::msg("polygon is no rectangle"))
+            } else {
+                let c_max: Coordinate<T> = Coordinate {x: f32::MAX.into(), y: f32::MAX.into()};
+                let min = exterior.0.iter().fold(c_max,|a: Coordinate<T>, b: &Coordinate<T>| {
+                    Coordinate {x: a.x.min(b.x), y: a.y.min(b.y) }
+                });
+                let c_min: Coordinate<T> = Coordinate {x: (-99999999999.9).into(), y: (-999999999.9).into()};
+                let max = exterior.0.iter().fold(c_min,|a: Coordinate<T>, b: &Coordinate<T>| {
+                    Coordinate { x: a.x.max(b.x), y: a.y.max(b.y) }
+                });
+
+                Ok(Rect::new(min, max))
+            }
+        }
+    }
 
     fn box_0_0_to_5_10() -> Rect<f64> {
         Rect::new(
@@ -242,8 +265,7 @@ mod tests {
     }
 }
 
-// hmmmm
-trait FromF64 {
+pub trait FromF64 {
     fn fromf64(x: &f64) -> Self;
 }
 impl FromF64 for f32 {
@@ -289,32 +311,6 @@ fn contains<T: ClipFloat>(rect: &Rect<T>, coord: &Coordinate<T>) -> bool {
         && coord.x <= rect.max().x
         && coord.y >= rect.min().y
         && coord.y <= rect.max().y
-}
-
-/// helper function
-fn multipoly_to_rect<T: ClipFloat>(multi_polygon: &MultiPolygon<T>) -> anyhow::Result<Rect<T>> {
-    let first_poly: &Polygon<T> = multi_polygon.0.first().ok_or(Error::msg("multipolygon is empty"))?;
-
-    if first_poly.interiors().len() > 0 {
-        Err(Error::msg("poly has interior features"))
-    } else {
-        let exterior = first_poly.exterior();
-        if exterior.0.len() != 5 {
-            Err(Error::msg("polygon is no rectangle"))
-        } else {
-            let c_max: Coordinate<T> = Coordinate {x: f32::MAX.into(), y: f32::MAX.into()};
-            let min = exterior.0.iter().fold(c_max,|a: Coordinate<T>, b: &Coordinate<T>| {
-                Coordinate {x: a.x.min(b.x), y: a.y.min(b.y) }
-            });
-            let c_min: Coordinate<T> = Coordinate {x: (-99999999999.9).into(), y: (-999999999.9).into()};
-            let max = exterior.0.iter().fold(c_min,|a: Coordinate<T>, b: &Coordinate<T>| {
-                Coordinate { x: a.x.max(b.x), y: a.y.max(b.y) }
-            });
-
-            Ok(Rect::new(min, max))
-        }
-    }
-
 }
 
 impl<T: ClipFloat> Clip<T> for Line<T> {

@@ -2,24 +2,23 @@ use std::cmp::Ordering;
 use anyhow::{bail, Error};
 use num_traits::cast::ToPrimitive;
 
-use geo::map_coords::{MapCoords, MapCoordsInplace};
+use geo::map_coords::{MapCoordsInplace};
 use geo::{Coordinate, Geometry, LineString, Rect};
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 
 use crate::dem::{DEMRaster, load_dem};
 use crate::feature::{FeatureCollection, Simplifiable};
-use crate::mvt::{load_geo_jsons, build_mounts, find_lod_layers, MvtGeoFloatType, Clip};
+use crate::mvt::{load_geo_jsons, build_mounts, find_lod_layers, MvtGeoFloatType};
 
 use std::collections::HashMap;
-use std::ops::{Add, Sub};
+use std::ops::{Add};
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
 
 use std::time::Instant;
 use contour::ContourBuilder;
 use geo::Geometry::Point;
 use geojson::{Feature, PolygonType, Value};
-use mapbox_vector_tile::{Layer, Properties, Tile};
+use mapbox_vector_tile::{Layer, Tile};
 use crate::feature::Feature as CrateFeature;
 use crate::metajson::{MetaJsonParser};
 
@@ -351,7 +350,7 @@ mod tests {
 
         assert!(tile_res.is_ok());
 
-        tile_has_point_at(&tile_res.unwrap(), 5000, 5000);
+        tile_has_point_at(&tile_res.unwrap(), 5000 - 4096, 5000 - 4096);
 
     }
 }
@@ -644,35 +643,10 @@ fn create_tile(col: u16, row: u16, collections: &mut HashMap<String, FeatureColl
 
     let tile_border = Rect::new(offset, offset.add(extent));
 
-    // define projection from global coordinates to tile coordinates. do we need that in this implementation?
-    let glob_to_tile_coords = |c: &Coordinate<MvtGeoFloatType>| {
-        c.sub(offset)
-    };
-
-    // map feature collections to layer models
-
     let mut layers: Vec<Layer> = vec![];
     collections.iter().for_each(|(name, features)| {
-        let mut layer = Layer::new(name);
-        features.iter().filter_map(|f| {
-            f.geometry.clip(&tile_border)
-        }).for_each(|f| {
-            layer.add_feature(mapbox_vector_tile::Feature {
-                geometry: f.map_coords(|(x,y)| {(x.to_i32().unwrap(), y.to_i32().unwrap())}),
-                properties: Rc::new(Properties::new()), // TODO
-            })
-        });
-
-        layers.push(layer);
-
+        layers.push(features.to_layer(name.clone(), &tile_border, &offset));
     });
-    // for each layer:
-        // for each geometry:
-            // clone
-            // clip the clone to tile bounds (clip.Geometry)
-            // project onto tile coordinates
-        // collect
-    // define tile, put layers into it
 
     Ok(Tile::from_layers(layers))
 }

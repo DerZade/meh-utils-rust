@@ -2,16 +2,16 @@ mod simplifiable;
 
 use std::collections::HashMap;
 use std::rc::Rc;
-use geo::{map_coords::MapCoordsInplace, map_coords::MapCoords, Geometry};
+use geo::{map_coords::MapCoordsInplace, map_coords::MapCoords, Geometry, Coordinate, Rect};
 use mapbox_vector_tile::{Layer, Properties};
 use num_traits::ToPrimitive;
 pub use simplifiable::Simplifiable;
-use crate::mvt::{MvtGeoFloatType};
+use crate::mvt::{MvtGeoFloatType, Clip};
 
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
-    use geo::{Coordinate, Geometry, Point};
+    use geo::{Coordinate, Geometry, Point, Rect};
     use mapbox_vector_tile::Layer;
     use num_traits::ToPrimitive;
     use crate::feature::{Feature, FeatureCollection};
@@ -31,7 +31,7 @@ mod tests {
             feature_collection.push(feature);
         });
 
-        let layer: Layer = feature_collection.to_layer("foo".to_string());
+        let layer: Layer = feature_collection.to_layer("foo".to_string(), &Rect::new(Coordinate::zero(), Coordinate::from((4096.0_f32, 4096.0_f32))), &Coordinate::zero());
 
         assert_eq!(2, layer.features.len());
         assert_eq!("foo".to_string(), layer.name);
@@ -132,6 +132,24 @@ pub struct Feature {
     pub geometry: Geometry<MvtGeoFloatType>,
     pub properties: HashMap<String, PropertyValue>
 }
+impl Feature {
+    pub fn clip(&self, rect: &Rect<MvtGeoFloatType>) -> Option<Self> {
+        self.geometry.clip(&rect).map(|geo| {
+            crate::feature::Feature {
+                geometry: geo,
+                properties: self.properties.clone(),
+            }
+        })
+    }
+    pub fn with_offset(&self, offset: &Coordinate<MvtGeoFloatType>) -> Self {
+        Feature {
+            geometry: self.geometry.map_coords(|(x,y)| {
+                (x - offset.x, y - offset.y)
+            }),
+            properties: self.properties.clone(),
+        }
+    }
+}
 
 impl Into<mapbox_vector_tile::Feature> for Feature {
     fn into(self) -> mapbox_vector_tile::Feature {
@@ -199,11 +217,16 @@ impl FeatureCollection {
     pub fn new() -> Self {
         FeatureCollection(Vec::<Feature>::new())
     }
-    pub fn to_layer(self, name: String) -> Layer {
+
+    pub fn to_layer(&self, name: String, tile_border: &Rect<MvtGeoFloatType>, offset: &Coordinate<MvtGeoFloatType>) -> Layer {
         let mut layer = Layer::new(name);
-        self.iter().for_each(|feature| {
-            layer.add_feature(feature.clone().into());
+
+        self.iter().filter_map(|f| {
+            f.clip(&tile_border).map(|f| f.with_offset(offset).into())
+        }).for_each(|f: mapbox_vector_tile::Feature| {
+            layer.add_feature(f)
         });
+
         layer
     }
 }
