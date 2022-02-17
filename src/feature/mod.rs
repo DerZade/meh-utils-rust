@@ -134,7 +134,7 @@ impl Into<mapbox_vector_tile::Value> for PropertyValue {
             PropertyValue::String(s) => mapbox_vector_tile::Value::String(Rc::new(s)),
             PropertyValue::Number(f) => mapbox_vector_tile::Value::Float(f),
             PropertyValue::Array(arr) => {
-                println!("WARNING: array of property values will be reduced to string");
+                // println!("WARNING: array of property values will be reduced to string");
                 let strings: Vec<String> = arr.into_iter().map(|v| {
                   v.into()
                 }).collect();
