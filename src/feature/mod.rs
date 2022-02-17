@@ -8,13 +8,16 @@ use num_traits::ToPrimitive;
 pub use simplifiable::Simplifiable;
 use crate::mvt::{MvtGeoFloatType, Clip};
 
+#[allow(non_snake_case)]
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
+    use std::rc::Rc;
     use geo::{Coordinate, Geometry, Point, Rect};
     use mapbox_vector_tile::Layer;
     use num_traits::ToPrimitive;
-    use crate::feature::{Feature, FeatureCollection};
+    use rstest::rstest;
+    use crate::feature::{Feature, FeatureCollection, PropertyValue};
 
     #[test]
     fn feature_collection_to_layer() {
@@ -46,6 +49,55 @@ mod tests {
             }
         });
     }
+
+    #[test]
+    fn PropertyValue_into_mapbox_vector_tile__Value_for_null() {
+        let mvt_v: mapbox_vector_tile::Value =  PropertyValue::Null.into();
+        assert!(matches!(mvt_v, mapbox_vector_tile::Value::Unknown));
+    }
+
+    #[rstest]
+    #[case(true)]
+    #[case(false)]
+    fn PropertyValue_into_mapbox_vector_tile__Value_for_bool(#[case] b: bool) {
+        let mvt_v: mapbox_vector_tile::Value = PropertyValue::Bool(b).into();
+        let expected = mapbox_vector_tile::Value::from(b);
+        assert_eq!(mvt_v, expected);
+    }
+
+    #[test]
+    fn PropertyValue_into_mapbox_vector_tile__Value_for_string() {
+        let mvt_v: mapbox_vector_tile::Value =  PropertyValue::String("foo".to_string()).into();
+        let expected = mapbox_vector_tile::Value::String(Rc::new("foo".to_string()));
+        assert_eq!(mvt_v, expected);
+    }
+
+    #[test]
+    fn PropertyValue_into_mapbox_vector_tile__Value_for_number() {
+        let mvt_v: mapbox_vector_tile::Value =  PropertyValue::Number(333.333).into();
+        let expected = mapbox_vector_tile::Value::Float(333.333);
+        assert_eq!(mvt_v, expected);
+    }
+
+
+    #[test]
+    fn PropertyValue_into_mapbox_vector_tile__Value_for_arr() {
+        let arr_v = PropertyValue::Array(vec![
+            PropertyValue::Null,
+            PropertyValue::Bool(true),
+            PropertyValue::String("foo".to_string()),
+            PropertyValue::Number(42.0_f32),
+            PropertyValue::Array(vec![PropertyValue::Bool(false)]),
+        ]);
+
+        let mvt_v: mapbox_vector_tile::Value = arr_v.into();
+
+        match mvt_v {
+            mapbox_vector_tile::Value::String(s) => assert_eq!(s.as_str(), "[null, true, \"foo\", 42, [false]]"),
+            _ => assert!(false, "oh noez. array values should convert into string"),
+        }
+    }
+
 }
 
 #[derive(Clone)]
@@ -57,6 +109,23 @@ pub enum PropertyValue {
     Array(Vec<PropertyValue>),
 }
 
+impl From<PropertyValue> for String {
+
+    fn from(v: PropertyValue) -> String {
+        match v {
+            PropertyValue::Null => String::from("null"),
+            PropertyValue::Bool(b) => b.to_string(),
+            PropertyValue::Number(f) => f.to_string(),
+            PropertyValue::String(s) => format!["\"{}\"", s],
+
+            PropertyValue::Array(a) => {
+                let strings: Vec<String> = a.into_iter().map(|v| { v.into() }).collect();
+                format!("[{}]", strings.join(", "))
+            },
+        }
+    }
+}
+
 impl Into<mapbox_vector_tile::Value> for PropertyValue {
     fn into(self) -> mapbox_vector_tile::Value {
         match self {
@@ -64,10 +133,13 @@ impl Into<mapbox_vector_tile::Value> for PropertyValue {
             PropertyValue::Bool(b) => mapbox_vector_tile::Value::Boolean(b),
             PropertyValue::String(s) => mapbox_vector_tile::Value::String(Rc::new(s)),
             PropertyValue::Number(f) => mapbox_vector_tile::Value::Float(f),
-            PropertyValue::Array(_) => {
-                println!("WARNING array of property values will be reduced to string");
-                todo!()
-                // mapbox_vector_tile::Value::String(Rc::new("ARRAY OF PROPERTY VALUES".to_string()))
+            PropertyValue::Array(arr) => {
+                println!("WARNING: array of property values will be reduced to string");
+                let strings: Vec<String> = arr.into_iter().map(|v| {
+                  v.into()
+                }).collect();
+
+                mapbox_vector_tile::Value::String(Rc::new(format!("[{}]", strings.join(", "))))
             }
         }
     }
