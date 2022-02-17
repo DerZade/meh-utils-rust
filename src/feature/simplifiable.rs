@@ -1,4 +1,3 @@
-use std::iter::Sum;
 use geo::{GeoFloat, Geometry, GeometryCollection};
 use geo::euclidean_length::EuclideanLength;
 use geo::area::Area;

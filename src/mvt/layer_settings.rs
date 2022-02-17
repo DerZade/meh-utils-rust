@@ -1,6 +1,4 @@
 use std::collections::HashMap;
-use std::iter::Sum;
-use geo::{CoordNum, GeoFloat};
 use crate::mvt::FeatureCollection;
 
 #[cfg(test)]

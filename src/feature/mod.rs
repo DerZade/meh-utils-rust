@@ -2,7 +2,7 @@ mod simplifiable;
 
 use std::collections::HashMap;
 use std::rc::Rc;
-use geo::{map_coords::MapCoordsInplace, map_coords::MapCoords, CoordNum, Geometry};
+use geo::{map_coords::MapCoordsInplace, map_coords::MapCoords, Geometry};
 use mapbox_vector_tile::{Layer, Properties};
 use num_traits::ToPrimitive;
 pub use simplifiable::Simplifiable;

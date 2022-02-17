@@ -3,7 +3,7 @@ use anyhow::{bail, Error};
 use num_traits::cast::ToPrimitive;
 
 use geo::map_coords::{MapCoords, MapCoordsInplace};
-use geo::{Coordinate, CoordNum, GeoFloat, Geometry, LineString, Rect};
+use geo::{Coordinate, Geometry, LineString, Rect};
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 
 use crate::dem::{DEMRaster, load_dem};
@@ -11,8 +11,7 @@ use crate::feature::{FeatureCollection, Simplifiable};
 use crate::mvt::{load_geo_jsons, build_mounts, find_lod_layers, MvtGeoFloatType, Clip};
 
 use std::collections::HashMap;
-use std::iter::Sum;
-use std::ops::Sub;
+use std::ops::{Add, Sub};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
@@ -35,6 +34,7 @@ mod tests {
     use geojson::{Geometry, Value};
     use geojson::Feature;
     use geojson::Value::{MultiPolygon};
+    use mapbox_vector_tile::Tile;
     use rand::{Rng, thread_rng};
     use crate::commands::mvt::{build_contours, build_lod_vector_tiles, build_vector_tiles, create_tile, fill_contour_layers, MapboxVectorTiles, try_from_geojson_feature_for_crate_feature, try_from_geojson_value_for_geo_geometry, vec_f64_to_coordinate_f32};
     use crate::dem::{DEMRaster, Origin};
@@ -314,32 +314,45 @@ mod tests {
 
     #[test]
     fn create_tile_returns_tile_with_features() {
+
+        fn tile_has_point_at(tile: &Tile, x: i32, y: i32) {
+            assert!(!tile.is_empty());
+            let maybe_layer = tile.layers.get(0);
+            assert!(maybe_layer.is_some());
+            let layer = maybe_layer.unwrap();
+            assert_eq!(1, layer.features.len());
+            let feat = layer.features.get(0).unwrap();
+            match feat.geometry {
+                geo::Geometry::Point(geo::Point(c)) => {
+                    assert_eq!(c.x, x);
+                    assert_eq!(c.y, y)
+                },
+                _ => assert!(false)
+            }
+        }
+
+
         let mut collections: HashMap<String, FeatureCollection> = HashMap::new();
         let mut foo_features = FeatureCollection(vec![]);
-        let feature_on_tile = geo::Geometry::Point(geo::Point(Coordinate {x: 1.0, y: 1.0}));
-        let feature_off_tile = geo::Geometry::Point(geo::Point(Coordinate {x: 5000.0, y: 5000.0}));
-        foo_features.push(CrateFeature {geometry: feature_on_tile, properties: HashMap::new()});
-        foo_features.push(CrateFeature {geometry: feature_off_tile, properties: HashMap::new()});
+        let point_on_tile = geo::Geometry::Point(geo::Point(Coordinate {x: 1.0, y: 1.0}));
+        foo_features.push(CrateFeature {geometry: point_on_tile, properties: HashMap::new()});
+        let point_off_tile = geo::Geometry::Point(geo::Point(Coordinate {x: 5000.0, y: 5000.0}));
+        foo_features.push(CrateFeature {geometry: point_off_tile, properties: HashMap::new()});
+
         collections.insert("foo".to_string(), foo_features);
 
         let tile_res = create_tile(0, 0, &mut collections);
 
         assert!(tile_res.is_ok());
 
-        let tile = tile_res.unwrap();
-        assert!(!tile.is_empty());
-        let maybe_layer = tile.layers.get(0);
-        assert!(maybe_layer.is_some());
-        let layer = maybe_layer.unwrap();
-        assert_eq!(1, layer.features.len());
-        let feat = layer.features.get(0).unwrap();
-        match feat.geometry {
-            geo::Geometry::Point(geo::Point(c)) => {
-                assert_eq!(c.x, 1);
-                assert_eq!(c.y, 1)
-            },
-            _ => assert!(false)
-        }
+        tile_has_point_at(&tile_res.unwrap(), 1, 1);
+
+        let tile_res = create_tile(1, 1, &mut collections);
+
+        assert!(tile_res.is_ok());
+
+        tile_has_point_at(&tile_res.unwrap(), 5000, 5000);
+
     }
 }
 
@@ -629,7 +642,7 @@ fn create_tile(col: u16, row: u16, collections: &mut HashMap<String, FeatureColl
         y: DEFAULT_EXTENT.into(),
     };
 
-    let tile_border = Rect::new(offset, extent);
+    let tile_border = Rect::new(offset, offset.add(extent));
 
     // define projection from global coordinates to tile coordinates. do we need that in this implementation?
     let glob_to_tile_coords = |c: &Coordinate<MvtGeoFloatType>| {

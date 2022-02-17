@@ -4,6 +4,7 @@ use geo::algorithm::line_intersection::{line_intersection, LineIntersection};
 use geo::algorithm::euclidean_distance::EuclideanDistance;
 use geo::algorithm::map_coords::MapCoords;
 use geo_clipper::{Clipper};
+use num_traits::ToPrimitive;
 
 #[cfg(test)]
 mod tests {
@@ -241,14 +242,37 @@ mod tests {
     }
 }
 
-// it would be neat to generalize this to a Diff trait (subtract one geometry from another!)
-// but that would be overkill much. do not need.
-pub trait Clip<T: GeoFloat, Rhs=Self> {
+// hmmmm
+trait FromF64 {
+    fn fromf64(x: &f64) -> Self;
+}
+impl FromF64 for f32 {
+    fn fromf64(x: &f64) -> Self {
+        match x.to_f32() {
+            Some(f) => f,
+            None => f32::MAX
+        }
+    }
+}
+impl FromF64 for f64 {
+    fn fromf64(x: &f64) -> Self {
+        x.clone()
+    }
+}
+
+pub trait ClipFloat: GeoFloat + std::convert::From<f32> + FromF64 {}
+impl<T> ClipFloat for T where T: GeoFloat + std::convert::From<f32> + FromF64 {
+
+}
+
+/// it would be neat to generalize this to a Diff trait (subtract one geometry from another!)
+/// but that would be overkill much. do not need.
+pub trait Clip<T: ClipFloat, Rhs=Self> {
     type Output;
     fn clip(&self, rect: &Rect<T>) ->  Option<Self::Output>;
 }
 
-impl<T: GeoFloat + std::convert::From<f32>> Clip<T> for Geometry<T> {
+impl<T: ClipFloat> Clip<T> for Geometry<T> {
     type Output=Geometry<T>;
     fn clip(&self, rect: &Rect<T>) -> Option<Geometry<T>> {
         match self {
@@ -260,7 +284,7 @@ impl<T: GeoFloat + std::convert::From<f32>> Clip<T> for Geometry<T> {
     }
 }
 
-fn contains<T: GeoFloat>(rect: &Rect<T>, coord: &Coordinate<T>) -> bool {
+fn contains<T: ClipFloat>(rect: &Rect<T>, coord: &Coordinate<T>) -> bool {
     coord.x >= rect.min().x
         && coord.x <= rect.max().x
         && coord.y >= rect.min().y
@@ -268,7 +292,7 @@ fn contains<T: GeoFloat>(rect: &Rect<T>, coord: &Coordinate<T>) -> bool {
 }
 
 /// helper function
-fn multipoly_to_rect<T: GeoFloat + std::convert::From<f32>>(multi_polygon: &MultiPolygon<T>) -> anyhow::Result<Rect<T>> {
+fn multipoly_to_rect<T: ClipFloat>(multi_polygon: &MultiPolygon<T>) -> anyhow::Result<Rect<T>> {
     let first_poly: &Polygon<T> = multi_polygon.0.first().ok_or(Error::msg("multipolygon is empty"))?;
 
     if first_poly.interiors().len() > 0 {
@@ -278,7 +302,7 @@ fn multipoly_to_rect<T: GeoFloat + std::convert::From<f32>>(multi_polygon: &Mult
         if exterior.0.len() != 5 {
             Err(Error::msg("polygon is no rectangle"))
         } else {
-            let c_max: Coordinate<T> = Coordinate {x: 99999999999.9.into(), y: 999999999.9.into()};
+            let c_max: Coordinate<T> = Coordinate {x: f32::MAX.into(), y: f32::MAX.into()};
             let min = exterior.0.iter().fold(c_max,|a: Coordinate<T>, b: &Coordinate<T>| {
                 Coordinate {x: a.x.min(b.x), y: a.y.min(b.y) }
             });
@@ -286,13 +310,14 @@ fn multipoly_to_rect<T: GeoFloat + std::convert::From<f32>>(multi_polygon: &Mult
             let max = exterior.0.iter().fold(c_min,|a: Coordinate<T>, b: &Coordinate<T>| {
                 Coordinate { x: a.x.max(b.x), y: a.y.max(b.y) }
             });
+
             Ok(Rect::new(min, max))
         }
     }
 
 }
 
-impl<T: GeoFloat> Clip<T> for Line<T> {
+impl<T: ClipFloat> Clip<T> for Line<T> {
     type Output = Line<T>;
 
     fn clip(&self, rect: &Rect<T>) -> Option<Self::Output> {
@@ -347,7 +372,7 @@ impl<T: GeoFloat> Clip<T> for Line<T> {
     }
 }
 
-impl<T: GeoFloat> Clip<T> for Point<T> {
+impl<T: ClipFloat> Clip<T> for Point<T> {
     type Output = Point<T>;
 
     fn clip(&self, rect: &Rect<T>) -> Option<Self::Output> {
@@ -363,7 +388,7 @@ impl<T: GeoFloat> Clip<T> for Point<T> {
     }
 }
 
-impl<T: GeoFloat + std::convert::From<f64>> Clip<T> for Polygon<T> {
+impl<T: ClipFloat> Clip<T> for Polygon<T> {
     type Output = MultiPolygon<T>;
 
     fn clip(&self, rect: &Rect<T>) -> Option<Self::Output> {
@@ -374,7 +399,7 @@ impl<T: GeoFloat + std::convert::From<f64>> Clip<T> for Polygon<T> {
             None
         } else {
             Some(clipped.map_coords(|(a, b)| {
-                ((*a).into(), (*b).into())
+                (T::fromf64(a), T::fromf64(b))
             }))
         }
     }
