@@ -689,9 +689,10 @@ fn build_lod_vector_tiles(collections: &mut HashMap<String, FeatureCollection>, 
 /// This function fills the `^contours/\d+$` layers selectively with features from "contours" layer.
 fn fill_contour_layers(lod_layer_names: Vec<String>, collections: &mut HashMap<String, FeatureCollection>) -> anyhow::Result<()> {
     // TODO establish if it should be "contours" or "contour_lines"
-    let contour_features: FeatureCollection = collections
-        .get_mut("contours")
-        .or_else(||{ collections.get_mut("contours")})
+    let contour_layer_a = collections.get_mut("contours");
+    // let contour_layer_b = collections.get_mut("contour_lines");
+    let contour_features: FeatureCollection = contour_layer_a
+        //.or_else(||{contour_layer_b})
         .ok_or(anyhow::Error::msg("could not find 'contours' or 'contour_lines' layer"))?
         .clone();
 

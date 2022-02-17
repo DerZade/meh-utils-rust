@@ -34,7 +34,10 @@ pub fn load_geo_jsons(input_path: &Path, collections: &mut HashMap<String, Featu
         let path_buf = entry.path();
         let path = path_buf.as_path();
         let layer_name = path_to_layer_name(path, input_path)?;
-        let fc = read_zipped_geo_json(path)?;
+        let fc = read_zipped_geo_json(path).map_err(|e| {
+            println!("ERROR: could not read zipped geo_json at {}: {}", path.to_str().unwrap_or("WAT"), e);
+            e
+        }).unwrap_or(FeatureCollection(vec![]));
 
         Ok((layer_name, fc))
     }).partition(Result::is_ok);

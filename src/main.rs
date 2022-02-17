@@ -1,3 +1,4 @@
+use std::process::exit;
 use clap::{App, app_from_crate, AppSettings};
 use crate::commands::{ClapCommand, PreviewCommand, SatCommand, MvtCommand, TerrainRgbCommand, MvtTestCommand};
 use crate::metajson::SerdeMetaJsonParser;
@@ -18,7 +19,8 @@ fn main() {
 
     if let Err(e) = execute(&args) {
         println!("❌ Error: {}", e);
-        std::process::exit(1);
+        println!("❌ Backtrace: {:?}", e.backtrace());
+        exit(1);
     }
 }
 
