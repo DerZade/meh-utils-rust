@@ -106,7 +106,6 @@ mod tests {
         let res = build_contours(&raster, 50.0, 2048, 2, &mut collections);
 
         assert!(res.is_ok());
-        assert_eq!(collections.len(), 1);
         assert!(collections.contains_key("contours"));
         let contour_lines: &FeatureCollection = collections.get("contours").unwrap();
         assert_eq!(contour_lines.len(), 5);
@@ -730,20 +729,20 @@ fn fill_contour_layers(lod_layer_names: Vec<String>, collections: &mut HashMap<S
         .ok_or(anyhow::Error::msg("could not find 'contours' layer"))?
         .clone();
 
-    let contours_names: Vec<(String, usize)> = lod_layer_names.iter().map(|name| {
-        let x = name.strip_prefix("contours/");
-        let n = x.map_or(0, |s| {
-            let i = s.parse::<usize>();
-            i.map_or(0, |n| {n})
-        });
-        (name.to_string(), n)
+    let contours_names: Vec<(String, usize)> = lod_layer_names.iter().filter_map(|name| {
+        name.strip_prefix("contours/").and_then(|num_str| {
+            let i = num_str.parse::<usize>();
+            i.ok()
+        }).map(|i| {
+            (name.to_string(), i)
+        })
     }).filter(|(_, interval)| {
         interval != &0
     }).collect();
 
     contours_names.iter().for_each(|(name, elevation)| {
         let features = contour_features.clone();
-        features.iter().step_by(elevation).for_each(|f| {
+        features.iter().step_by(*elevation).for_each(|f| {
             collections.get_mut(name).unwrap().push(f.clone());
         });
     });
