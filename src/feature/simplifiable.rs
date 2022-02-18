@@ -111,6 +111,7 @@ mod tests {
 }
 
 pub trait Simplifiable<T> {
+    /// using https://de.wikipedia.org/wiki/Douglas-Peucker-Algorithmus
     fn simplify(&mut self, epsilon: T) -> ();
     fn remove_empty(&mut self, line_limit: T, area_limit: T) -> ();
 }
@@ -147,6 +148,8 @@ impl Simplifiable<MvtGeoFloatType> for FeatureCollection {
     // The iterator returned by iter will yield &T, by convention.
     // The iterator returned by iter_mut will yield &mut T, by convention.
 
+    ///
+    /// removes lines shorter/smaller than the limit
     ///
     /// here the Go implementation, see https://github.com/paulmach/orb/blob/master/encoding/mvt/simplify.go
     ///

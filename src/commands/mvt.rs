@@ -59,16 +59,36 @@ mod tests {
         });
     }
 
+    #[test]
+    fn build_contours_creates_empty_contour_layers_for_1_5_10_50_100() {
+        let raster = DEMRaster::new(2, 2, Origin::Corner(0.0, 0.0), 1.0, -9999.99, vec![
+            0.0, 6.0,
+            1.0, 7.0,
+        ]);
+        let mut collections: HashMap<String, FeatureCollection> = HashMap::new();
+        let res = build_contours(&raster, 0.0, 2, 2, &mut collections);
+
+        assert!(res.is_ok());
+
+        vec![
+          "contours/01", "contours/05", "contours/10", "contours/50", "contours/100"
+        ].into_iter().for_each(|k| {
+            let layer = collections.get(k);
+            assert!(layer.is_some(), "no layer {}!", k);
+            assert_eq!(0, layer.unwrap().0.len());
+        });
+    }
 
     #[test]
     fn build_contours_does_its_thing() {
         let contour_line_to_vec_of_tuple = |feature: &CrateFeature| -> Vec<(f32, f32)> {
             match &feature.geometry {
-                geo::Geometry::MultiPolygon(foo) => {
-                    let poly = foo.0.get(0).unwrap();
+                geo::Geometry::MultiPolygon(empty_poly) if empty_poly.0.len() == 0 => vec![],
+                geo::Geometry::MultiPolygon(some_poly) => {
+                    let poly = some_poly.0.get(0).unwrap();
                     let ext = poly.exterior();
                     ext.0.iter().map(|f| { (f.x.clone(), f.y.clone()) }).collect()
-                },
+                }
                 _ => vec![],
             }
         };
@@ -83,14 +103,14 @@ mod tests {
         ]);
         let mut collections: HashMap<String, FeatureCollection> = HashMap::new();
 
-        let res = build_contours(&raster, 0.0, 2048, 2, &mut collections);
+        let res = build_contours(&raster, 50.0, 2048, 2, &mut collections);
 
         assert!(res.is_ok());
         assert_eq!(collections.len(), 1);
-        assert!(collections.contains_key("contour_lines"));
-        let contour_lines: &FeatureCollection = collections.get("contour_lines").unwrap();
+        assert!(collections.contains_key("contours"));
+        let contour_lines: &FeatureCollection = collections.get("contours").unwrap();
         assert_eq!(contour_lines.len(), 5);
-        println!("ookay collection: {}", collections.get("contour_lines").unwrap().0.len());
+        println!("ookay collection: {}", collections.get("contours").unwrap().0.len());
 
         let v = contour_line_to_vec_of_tuple(contour_lines.0.get(0).unwrap());
 
@@ -511,26 +531,25 @@ fn calc_max_lod (_world_size: u32) -> u8 {
 fn build_contours(dem: &DEMRaster, elevation_offset: f32, _: u32, step: usize, collections: &mut HashMap<String, FeatureCollection>) -> anyhow::Result<()> {
     let cmp = |a: &&f64, b: &&f64| -> Ordering {a.partial_cmp(b).unwrap()};
 
-    let elevation_offset_f64 = elevation_offset.to_f64().unwrap();
+    let no_data_value: f64 = dem.get_no_data_value().to_f64().unwrap();
     let dem64 = dem
         .get_data()
-        .iter()
-        .map(|x| { (elevation_offset + x).to_f64().unwrap()})
+        .into_iter()
+        .map(|i| {i.to_f64().unwrap()})
         .collect::<Vec<f64>>();
 
-    let no_data_value: f64 = dem.get_no_data_value().to_f64().unwrap();
+
     let min_elevation = dem64.iter().filter(|x| {*x != &no_data_value}).min_by(cmp).map(|f| {f.to_i64().unwrap()}).ok_or(anyhow::Error::msg("no values in DEM raster"))?;
     let max_elevation = dem64.iter().filter(|x| {*x != &no_data_value}).max_by(|a, b| -> Ordering {a.partial_cmp(b).unwrap()}).map(|f| {f.to_i64().unwrap()}).ok_or(anyhow::Error::msg("no values in DEM raster"))?;
     // hmm how do we use worldsize? do we?
 
     let builder = ContourBuilder::new(dem.dimensions().0 as u32, dem.dimensions().1 as u32, false);
-    let thresholds: Vec<f64> = (min_elevation..=max_elevation).step_by(step).map(|f| {f.to_f64().unwrap() + elevation_offset_f64}).collect();
+    let thresholds: Vec<f64> = (min_elevation..=max_elevation).step_by(step).map(|i| {i as f64}).collect();
 
     println!("## contour builder ##");
     println!("dimensions: {} by {}", dem.dimensions().0 as u32, dem.dimensions().1 as u32);
     println!("all thresholds: {}", thresholds.iter().map(|f| {f.to_string()}).collect::<Vec<String>>().join(" "));
-    println!("elevation offset: {}", elevation_offset_f64);
-    println!("elevation offset: {}", elevation_offset_f64);
+    println!("elevation offset: {}", elevation_offset);
 
     let res = builder.contours(&dem64, &thresholds).map(|features: Vec<Feature>| {
         /*
@@ -543,10 +562,17 @@ fn build_contours(dem: &DEMRaster, elevation_offset: f32, _: u32, step: usize, c
             try_from_geojson_feature_for_crate_feature(f).ok()
         }).collect();
 
-        let k = String::from("contour_lines");
+        let k = String::from("contours");
         collections.insert(k, FeatureCollection(foo));
         ()
     });
+
+    // define *empty* 1,5,10,50,100 contour line layers, to be filled *later* after lod-specific selection!
+    collections.insert("contours/01".to_string(), FeatureCollection(vec![]));
+    collections.insert("contours/05".to_string(), FeatureCollection(vec![]));
+    collections.insert("contours/10".to_string(), FeatureCollection(vec![]));
+    collections.insert("contours/50".to_string(), FeatureCollection(vec![]));
+    collections.insert("contours/100".to_string(), FeatureCollection(vec![]));
 
     match res {
         Ok(_) => Ok(()),
@@ -598,6 +624,7 @@ fn build_vector_tiles(output_path: &Path, mut collections: HashMap<String, Featu
             if name.starts_with("locations") {
                 return
             }
+            println!("simplifying {} at lod {}", name.as_str(), lod);
 
             match name.as_str() {
                 "bunker" | "chapel" | "church" | "cross" | "fuelstation" | "lighthouse" | "rock" | "shipwreck" | "transmitter" | "watertower" | "fortress" | "fountain" | "view-tower" | "quay" | "hospital" | "busstop" | "stack" | "ruin" | "tourism" | "powersolar" | "powerwave" | "powerwind" | "tree" | "bush" => {}
@@ -695,11 +722,12 @@ fn fill_contour_layers(lod_layer_names: Vec<String>, collections: &mut HashMap<S
     // TODO establish if it should be "contours" or "contour_lines"
     let mut contour_layer = collections.get_mut("contours");
     if contour_layer.is_none() {
+        println!("wtf, 'contours' does not exist? should not happen!");
         contour_layer = collections.get_mut("contour_lines")
     }
 
     let contour_features: FeatureCollection = contour_layer
-        .ok_or(anyhow::Error::msg("could not find 'contours' or 'contour_lines' layer"))?
+        .ok_or(anyhow::Error::msg("could not find 'contours' layer"))?
         .clone();
 
     let contours_names: Vec<(String, usize)> = lod_layer_names.iter().map(|name| {
@@ -713,10 +741,10 @@ fn fill_contour_layers(lod_layer_names: Vec<String>, collections: &mut HashMap<S
         interval != &0
     }).collect();
 
-    contours_names.iter().for_each(|contour| {
+    contours_names.iter().for_each(|(name, elevation)| {
         let features = contour_features.clone();
-        features.iter().step_by(contour.1).for_each(|f| {
-            collections.get_mut(&contour.0).unwrap().push(f.clone());
+        features.iter().step_by(elevation).for_each(|f| {
+            collections.get_mut(name).unwrap().push(f.clone());
         });
     });
     Ok(())
