@@ -8,7 +8,7 @@ use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 
 use crate::dem::{DEMRaster, load_dem};
 use crate::feature::{FeatureCollection, Simplifiable};
-use crate::mvt::{load_geo_jsons, build_mounts, find_lod_layers, MvtGeoFloatType};
+use crate::mvt::{load_geo_jsons, build_mounts, find_lod_layers, MvtGeoFloatType, ArmaMaxLodTileProjection, Collections, LodProjection};
 
 use std::collections::HashMap;
 use std::ops::{Add};
@@ -40,6 +40,7 @@ mod tests {
     use crate::dem::{DEMRaster, Origin};
     use crate::feature::{Feature as CrateFeature, FeatureCollection};
     use crate::metajson::DummyMetaJsonParser;
+    use crate::mvt::Collections;
     use crate::test::with_input_and_output_paths;
 
     #[test]
@@ -65,13 +66,13 @@ mod tests {
             0.0, 6.0,
             1.0, 7.0,
         ]);
-        let mut collections: HashMap<String, FeatureCollection> = HashMap::new();
+        let mut collections: Collections = Collections::new();
         let res = build_contours(&raster, 0.0, 2, 2, &mut collections);
 
         assert!(res.is_ok());
 
         vec![
-          "contours/01", "contours/05", "contours/10", "contours/50", "contours/100"
+          "contours/1", "contours/5", "contours/10", "contours/50", "contours/100"
         ].into_iter().for_each(|k| {
             let layer = collections.get(k);
             assert!(layer.is_some(), "no layer {}!", k);
@@ -101,7 +102,7 @@ mod tests {
             1.0, 7.0, 5.0, 3.0, 0.0,
             0.0, 1.0, 1.0, 1.0, 0.0,
         ]);
-        let mut collections: HashMap<String, FeatureCollection> = HashMap::new();
+        let mut collections: Collections = Collections::new();
 
         let res = build_contours(&raster, 50.0, 2048, 2, &mut collections);
 
@@ -211,7 +212,7 @@ mod tests {
     #[test]
     fn build_vector_tiles_does_not_explode_on_0_lods() {
         with_input_and_output_paths(|_, output_path| {
-            let res = build_vector_tiles(&output_path, HashMap::<String, FeatureCollection>::new(), 0, 1);
+            let res = build_vector_tiles(&output_path, Collections::new(), 0, 1);
 
             assert!(res.is_ok());
         });
@@ -220,7 +221,7 @@ mod tests {
     #[test]
     fn build_vector_tiles_does_not_explode_on_empty_input() {
         with_input_and_output_paths(|_, output_path| {
-            let res = build_vector_tiles(&output_path, HashMap::<String, FeatureCollection>::new(), 1, 1);
+            let res = build_vector_tiles(&output_path, Collections::new(), 1, 1);
 
             assert!(res.is_ok());
         });
@@ -438,7 +439,6 @@ fn try_from_geojson_value_for_geo_geometry(value: Value) -> anyhow::Result<Geome
     }
 }
 
-
 pub struct MapboxVectorTiles {
     meta_json: Box<dyn MetaJsonParser>,
 }
@@ -448,7 +448,7 @@ impl MapboxVectorTiles {
     }
 
     pub fn exec(&self, input_path: &Path, output_path: &Path) -> anyhow::Result<()> {
-        let mut collections: HashMap<String, FeatureCollection> = HashMap::new();
+        let mut collections: Collections = Collections::new();
 
         let start = Instant::now();
 
@@ -527,7 +527,7 @@ fn calc_max_lod (_world_size: u32) -> u8 {
 
 
 
-fn build_contours(dem: &DEMRaster, elevation_offset: f32, _: u32, step: usize, collections: &mut HashMap<String, FeatureCollection>) -> anyhow::Result<()> {
+fn build_contours(dem: &DEMRaster, elevation_offset: f32, _: u32, step: usize, collections: &mut Collections) -> anyhow::Result<()> {
     let cmp = |a: &&f64, b: &&f64| -> Ordering {a.partial_cmp(b).unwrap()};
 
     let no_data_value: f64 = dem.get_no_data_value().to_f64().unwrap();
@@ -551,24 +551,17 @@ fn build_contours(dem: &DEMRaster, elevation_offset: f32, _: u32, step: usize, c
     println!("elevation offset: {}", elevation_offset);
 
     let res = builder.contours(&dem64, &thresholds).map(|features: Vec<Feature>| {
-        /*
-            c.iter().map(|geojson_feature: &Feature| {
-                let points: Bbox = geojson_feature.geometry.unwrap().bbox.unwrap();
-
-            })
-        */
         let foo: Vec<CrateFeature> = features.into_iter().filter_map(|f| {
             try_from_geojson_feature_for_crate_feature(f).ok()
         }).collect();
 
-        let k = String::from("contours");
-        collections.insert(k, FeatureCollection(foo));
+        collections.insert(String::from("contours"), FeatureCollection(foo));
         ()
     });
 
     // define *empty* 1,5,10,50,100 contour line layers, to be filled *later* after lod-specific selection!
-    collections.insert("contours/01".to_string(), FeatureCollection(vec![]));
-    collections.insert("contours/05".to_string(), FeatureCollection(vec![]));
+    collections.insert("contours/1".to_string(), FeatureCollection(vec![]));
+    collections.insert("contours/5".to_string(), FeatureCollection(vec![]));
     collections.insert("contours/10".to_string(), FeatureCollection(vec![]));
     collections.insert("contours/50".to_string(), FeatureCollection(vec![]));
     collections.insert("contours/100".to_string(), FeatureCollection(vec![]));
@@ -581,34 +574,17 @@ fn build_contours(dem: &DEMRaster, elevation_offset: f32, _: u32, step: usize, c
 
 const TILE_SIZE: u64 = 4096;
 
-fn build_vector_tiles(output_path: &Path, mut collections: HashMap<String, FeatureCollection>, max_lod: u8, world_size: u32) -> anyhow::Result<()> {
-
-    let world_size_f32 = world_size as f32;
-    let tiles_per_col_row = 2_u32.pow(max_lod as u32);
-    let pixels = tiles_per_col_row as u64 * TILE_SIZE;
-    let factor = pixels as f32 / world_size_f32;
-
-    let factor_t: MvtGeoFloatType = factor.into();
-    let world_size_t: MvtGeoFloatType = world_size_f32.into();
-
-    project_layers_in_place(&mut collections, |(x, y): &(MvtGeoFloatType, MvtGeoFloatType)| {
-        (
-            *x * factor_t,
-            (world_size_t - *y) * factor_t,
-        )
-    });
+fn build_vector_tiles(output_path: &Path, mut collections: Collections, max_lod: u8, world_size: u32) -> anyhow::Result<()> {
+    let mut projection = ArmaMaxLodTileProjection::new(collections, world_size, max_lod, TILE_SIZE);
 
     for lod in (0..=max_lod).rev() {
         let lod_dir: PathBuf = output_path.join(lod.to_string());
         let _start = Instant::now();
 
-		// project from last LOD to this LOD
-        if lod != max_lod {
-            project_layers_in_place(&mut collections, |(x, y): &(MvtGeoFloatType, MvtGeoFloatType)| ((x / 2.0).into(), (y / 2.0).into()));
-        }
+        projection.decrease_lod();
 
 		// simplify layers
-        collections.par_iter_mut().for_each(|(name, collection)| {
+        projection.get_collections_mut().par_iter_mut().for_each(|(name, collection)| {
 
             if lod == max_lod && name.eq("mount") {
                 simplify_mounts(collection, 100.0);
@@ -648,12 +624,13 @@ fn build_vector_tiles(output_path: &Path, mut collections: HashMap<String, Featu
             // val.
         });
 
-        let lod_layer_names = find_lod_layers(&collections, lod);
+
+        let lod_layer_names = find_lod_layers(projection.get_collections_mut(), lod);
         // note: the following is called fillContourLayers in https://github.com/DerZade/meh-utils/blob/master/internal/mvt/buildVectorTiles.go#L239-L278
-        fill_contour_layers(lod_layer_names, &mut collections).unwrap_or_else(|e| {
+        fill_contour_layers(lod_layer_names, projection.get_collections_mut()).unwrap_or_else(|e| {
             println!("could not generate contours for lod {}: {}", lod, e);
         });
-        let res = build_lod_vector_tiles(&mut collections, world_size, lod, &lod_dir);
+        let res = build_lod_vector_tiles(projection.get_collections_mut(), world_size, lod, &lod_dir);
         if res.is_err() {
             println!("error when generating vector tiles for lod {}: {}", lod, res.err().unwrap());
         }

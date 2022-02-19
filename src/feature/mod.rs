@@ -1,6 +1,7 @@
 mod simplifiable;
 
 use std::collections::HashMap;
+use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 use geo::{map_coords::MapCoordsInplace, map_coords::MapCoords, Geometry, Coordinate, Rect};
 use mapbox_vector_tile::{Layer, Properties};
@@ -245,16 +246,14 @@ impl Into<mapbox_vector_tile::Feature> for Feature {
 
 #[derive(Clone)]
 pub struct FeatureCollection(pub Vec<Feature>);
-
-impl std::ops::Deref for FeatureCollection {
+impl Deref for FeatureCollection {
     type Target = Vec<Feature>;
-    fn deref(&self) -> &Vec<Feature> {
+    fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
-
-impl std::ops::DerefMut for FeatureCollection {
-    fn deref_mut(&mut self) -> &mut Vec<Feature> {
+impl DerefMut for FeatureCollection {
+    fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
