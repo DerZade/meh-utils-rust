@@ -6,6 +6,7 @@ use crate::feature::FeatureCollection;
 use crate::mvt::MvtGeoFloatType;
 
 pub struct Collections(pub HashMap<String, FeatureCollection>);
+
 impl Collections {
     pub fn new() -> Self {
         Collections(HashMap::new())

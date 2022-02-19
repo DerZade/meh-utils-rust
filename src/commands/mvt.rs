@@ -209,15 +209,6 @@ mod tests {
     }
 
     #[test]
-    fn build_vector_tiles_does_not_explode_on_0_lods() {
-        with_input_and_output_paths(|_, output_path| {
-            let res = build_vector_tiles(&output_path, Collections::new(), 0, 1);
-
-            assert!(res.is_ok());
-        });
-    }
-
-    #[test]
     fn build_vector_tiles_does_not_explode_on_empty_input() {
         with_input_and_output_paths(|_, output_path| {
             let res = build_vector_tiles(&output_path, Collections::new(), 1, 1);
@@ -519,9 +510,10 @@ impl MapboxVectorTiles {
 }
 
 
-fn calc_max_lod (_world_size: u32) -> u8 {
+fn calc_max_lod (_world_size: u32) -> usize {
     // TODO
-    return 5_u8;
+    println!("TODO: calc_max_lod is a stub that returns 5");
+    5
 }
 
 
@@ -573,22 +565,23 @@ fn build_contours(dem: &DEMRaster, elevation_offset: f32, _: u32, step: usize, c
 
 const TILE_SIZE: u64 = 4096;
 
-fn build_vector_tiles(output_path: &Path, collections: Collections, max_lod: u8, world_size: u32) -> anyhow::Result<()> {
+fn build_vector_tiles(output_path: &Path, collections: Collections, max_lod: usize, world_size: u32) -> anyhow::Result<()> {
     let mut projection = ArmaMaxLodTileProjection::new(collections, world_size, max_lod, TILE_SIZE);
 
-    for lod in (0..=max_lod).rev() {
+    let mut projection_lod = Ok(max_lod);
+    while let Ok(lod) = projection_lod {
         let lod_dir: PathBuf = output_path.join(lod.to_string());
-        let _start = Instant::now();
 
 		// simplify layers
+        let is_max_lod = projection.is_max_lod();
         projection.get_collections_mut().par_iter_mut().for_each(|(name, collection)| {
 
-            if lod == max_lod && name.eq("mount") {
+            if is_max_lod && name.eq("mount") {
                 simplify_mounts(collection, 100.0);
             }
 
             // max lod should not be simplified
-            if lod == max_lod {
+            if is_max_lod {
                 return;
             }
 
@@ -627,12 +620,11 @@ fn build_vector_tiles(output_path: &Path, collections: Collections, max_lod: u8,
         fill_contour_layers(lod_layer_names, projection.get_collections_mut()).unwrap_or_else(|e| {
             println!("could not generate contours for lod {}: {}", lod, e);
         });
-        let res = build_lod_vector_tiles(projection.get_collections_mut(), world_size, lod, &lod_dir);
-        if res.is_err() {
-            println!("error when generating vector tiles for lod {}: {}", lod, res.err().unwrap());
-        }
+        build_lod_vector_tiles(projection.get_collections_mut(), world_size, lod, &lod_dir).unwrap_or_else(|err| {
+            println!("error when generating vector tiles for lod {}: {}", lod, err);
+        });
 
-        projection.decrease_lod()?;
+        projection_lod = projection.decrease_lod();
     }
 
     Ok(())
@@ -660,7 +652,7 @@ fn create_tile(col: u16, row: u16, collections: &mut HashMap<String, FeatureColl
     Ok(Tile::from_layers(layers))
 }
 
-fn build_lod_vector_tiles(collections: &mut HashMap<String, FeatureCollection>, world_size: u32, lod: u8, lod_dir: &PathBuf) -> anyhow::Result<()> {
+fn build_lod_vector_tiles(collections: &mut HashMap<String, FeatureCollection>, world_size: u32, lod: usize, lod_dir: &PathBuf) -> anyhow::Result<()> {
     println!("build_lod_vector_tiles with {} collections, worldsize {} and lod {} into {}", collections.len(), world_size, lod, lod_dir.to_str().unwrap_or("WAT"));
 
     fn ensure_directory(dir: &PathBuf) -> Result<(), Error>{
@@ -694,12 +686,12 @@ fn build_lod_vector_tiles(collections: &mut HashMap<String, FeatureCollection>, 
 /// Example: contours/10 is supposed to contain contour lines in 10m intervals.
 /// This function fills the `^contours/\d+$` layers selectively with features from "contours" layer.
 fn fill_contour_layers(lod_layer_names: Vec<String>, collections: &mut HashMap<String, FeatureCollection>) -> anyhow::Result<()> {
-    // TODO establish if it should be "contours" or "contour_lines"
+
     let mut contour_layer = collections.get_mut("contours");
-    if contour_layer.is_none() {
-        println!("wtf, 'contours' does not exist? should not happen!");
-        contour_layer = collections.get_mut("contour_lines")
-    }
+
+
+
+
 
     let contour_features: FeatureCollection = contour_layer
         .ok_or(anyhow::Error::msg("could not find 'contours' layer"))?

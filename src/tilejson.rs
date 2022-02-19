@@ -67,14 +67,14 @@ pub struct TileJSON {
     pub name: String,
     pub description: String,
     pub scheme: String,
-    pub minzoom: u8,
-    pub maxzoom: u8,
+    pub minzoom: usize,
+    pub maxzoom: usize,
     pub vector_layers: Option<Vec<TileJSONLayer>>,
 }
 
 pub fn write(
     dir: &Path,
-    max_lod: u8,
+    max_lod: usize,
     meta: MetaJSON,
     type_display_name: &str,
     vector_layer_names: &Vec<String>,
@@ -98,7 +98,7 @@ pub fn write(
         ),
         scheme: String::from("xyz"),
         minzoom: 0,
-        maxzoom: max_lod,
+        maxzoom: max_lod.into(),
         vector_layers: Some(vector_layers),
     };
 
