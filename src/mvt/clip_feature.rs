@@ -13,8 +13,8 @@ mod tests {
     use geo::algorithm::translate::Translate;
     use crate::mvt::clip_feature::{Clip, ClipFloat};
 
-    fn multipoly_to_rect<T: ClipFloat>(multi_polygon: &MultiPolygon<T>) -> anyhow::Result<Rect<T>> {
-        let first_poly: &Polygon<T> = multi_polygon.0.first().ok_or(Error::msg("multipolygon is empty"))?;
+    fn multipoly_to_rect<T: ClipFloat>(multi_polygon: &MultiPolygon<T>, idx: usize) -> anyhow::Result<Rect<T>> {
+        let first_poly: &Polygon<T> = multi_polygon.0.get(idx).ok_or(Error::msg("multipolygon is empty"))?;
 
         if first_poly.interiors().len() > 0 {
             Err(Error::msg("poly has interior features"))
@@ -188,21 +188,13 @@ mod tests {
     fn clip_polygon_that_surrounds_box_will_return_box() {
         let rect = box_0_0_to_5_10();
 
-        let polygon = geo::Geometry::Polygon(Polygon::new(
-            LineString(vec![
-                Coordinate {x: -1.0, y: -1.0},
-                Coordinate {x: -1.0, y: 11.0},
-                Coordinate {x: 6.0, y: 11.0},
-                Coordinate {x: 6.0, y: -1.0},
-            ]),
-            vec![],
-        ));
+        let polygon = geo::Geometry::Polygon(polygon_contains_the_box());
 
         let clipped = polygon.clip(&rect);
 
         assert!(clipped.is_some());
         let clipped_rect = match clipped {
-            Some(geo::Geometry::MultiPolygon(v)) => multipoly_to_rect(&v),
+            Some(geo::Geometry::MultiPolygon(v)) => multipoly_to_rect(&v, 0),
             _ => Err(Error::msg("mee"))
         };
         assert_eq!(rect, clipped_rect.unwrap());
@@ -217,7 +209,28 @@ mod tests {
     fn clip_polygon_thats_outside_the_box_will_return_none(#[case] offset_x: f64, #[case] offset_y: f64) {
         let rect = box_0_0_to_5_10();
         // somewhat irregular pentagon
-        let polygon = geo::Geometry::Polygon(Polygon::new(
+        let polygon = geo::Geometry::Polygon(small_polygon());
+        let polygon_trans = polygon.translate(offset_x, offset_y);
+
+        let clipped = polygon_trans.clip(&rect);
+
+        assert!(clipped.is_none());
+    }
+
+    fn polygon_contains_the_box() -> geo::Polygon<f64> {
+        Polygon::new(
+            LineString(vec![
+                Coordinate {x: -1.0, y: -1.0},
+                Coordinate {x: -1.0, y: 11.0},
+                Coordinate {x: 6.0, y: 11.0},
+                Coordinate {x: 6.0, y: -1.0},
+            ]),
+            vec![],
+        )
+    }
+
+    fn small_polygon() -> geo::Polygon<f64> {
+        Polygon::new(
             LineString(vec![
                 Coordinate {x: 1.0, y: 1.0},
                 Coordinate {x: 2.0, y: 1.0},
@@ -226,19 +239,11 @@ mod tests {
                 Coordinate {x: 0.0, y: 2.0},
             ]),
             vec![],
-        ));
-        let polygon_trans = polygon.translate(offset_x, offset_y);
-
-        let clipped = polygon_trans.clip(&rect);
-
-        assert!(clipped.is_none());
+        )
     }
 
-    #[test]
-    fn clip_poly_thats_partially_in_the_box_will_return_clipped() {
-        let rect = box_0_0_to_5_10();
-        // somewhat irregular pentagon
-        let polygon = geo::Geometry::Polygon(Polygon::new(
+    fn polygon_partially_in_box() -> geo::Polygon<f64> {
+        Polygon::new(
             LineString(vec![
                 Coordinate {x: -5.0, y: -5.0},
                 Coordinate {x: 2.5, y: -5.0},
@@ -247,21 +252,54 @@ mod tests {
                 Coordinate {x: -5.0, y: -5.0},
             ]),
             vec![],
-        ));
+        )
+    }
+
+    fn polygon_partially_in_box_clipped() -> geo::Rect<f64> {
+        Rect::new(
+            Coordinate {x: 0.0, y: 0.0},
+            Coordinate {x: 2.5, y: 10.0},
+        )
+    }
+
+    #[test]
+    fn clip_polygon_thats_partially_in_the_box_will_return_clipped() {
+        let rect = box_0_0_to_5_10();
+        // somewhat irregular pentagon
+        let polygon = geo::Geometry::Polygon(polygon_partially_in_box());
 
         let clipped = polygon.clip(&rect);
 
         assert!(clipped.is_some());
-        let expected = Rect::new(
-            Coordinate {x: 0.0, y: 0.0},
-            Coordinate {x: 2.5, y: 10.0},
-        );
+        let expected = polygon_partially_in_box_clipped();
         let clipped_rect = match clipped {
-            Some(geo::Geometry::MultiPolygon(v)) => multipoly_to_rect(&v),
+            Some(geo::Geometry::MultiPolygon(v)) => multipoly_to_rect(&v, 0),
             _ => Err(Error::msg("mee"))
         };
         assert_eq!(expected, clipped_rect.unwrap());
+    }
 
+    #[test]
+    fn clip_multipolygon_clips_them_all() {
+        let rect = box_0_0_to_5_10();
+        // somewhat irregular pentagon
+        let polygon = geo::Geometry::MultiPolygon(MultiPolygon(vec![
+            small_polygon().translate(25.0, 25.0),
+            polygon_partially_in_box(),
+            polygon_contains_the_box(),
+        ]));
+
+        let clipped = polygon.clip(&rect);
+
+        assert!(clipped.is_some());
+        match clipped {
+            Some(geo::Geometry::MultiPolygon(mpg)) => {
+                assert_eq!(2, mpg.0.len());
+                assert_eq!(multipoly_to_rect(&mpg, 0).unwrap(), polygon_partially_in_box_clipped());
+                assert_eq!(multipoly_to_rect(&mpg, 1).unwrap(), rect);
+            },
+            _ => assert!(false)
+        }
     }
 }
 
@@ -301,6 +339,13 @@ impl<T: ClipFloat> Clip<T> for Geometry<T> {
             Geometry::Point(pt) => pt.clip(rect).map(|p| {Geometry::Point(p)}),
             Geometry::Line(l) => l.clip(rect).map(|l| {Geometry::Line(l)}),
             Geometry::Polygon(pg) => pg.clip(rect).map(|pg| {Geometry::MultiPolygon(pg)}),
+            Geometry::MultiPolygon(mpg) => {
+                let polys = mpg
+                    .iter()
+                    .filter_map(|pg| { pg.clip(rect)});
+
+                Some(Geometry::MultiPolygon(polys.flatten().collect()))
+            },
             _ => None,
         }
     }

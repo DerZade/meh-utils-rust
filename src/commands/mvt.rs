@@ -34,7 +34,6 @@ mod tests {
     use geojson::Value::{MultiPolygon};
     use mapbox_vector_tile::Tile;
     use rand::{Rng, thread_rng};
-    use rstest::rstest;
     use crate::commands::mvt::{build_contours, build_lod_vector_tiles, build_vector_tiles, create_tile, fill_contour_layers, MapboxVectorTiles, try_from_geojson_feature_for_crate_feature, try_from_geojson_value_for_geo_geometry, vec_f64_to_coordinate_f32};
     use crate::dem::{DEMRaster, Origin};
     use crate::feature::{Feature as CrateFeature, FeatureCollection};
@@ -244,10 +243,9 @@ mod tests {
         assert!(res.is_err());
     }
 
-    #[rstest]
-    #[case("contours")]
-    #[case("contour_lines")]
-    fn fill_contour_layers_copies_all_features_from_contours_to_contours_1(#[case] contours_layer_name: &str) {
+    #[test]
+    fn fill_contour_layers_copies_all_features_from_contours_to_contours_1() {
+        let contours_layer_name = "contours";
         let mut layers = collections_with_layers(vec![contours_layer_name, "contours/1", "foo"]);
         layers.get_mut("foo").unwrap().push(some_feature());
         layers.get_mut(contours_layer_name).unwrap().push(some_feature());
@@ -687,11 +685,7 @@ fn build_lod_vector_tiles(collections: &mut HashMap<String, FeatureCollection>, 
 /// This function fills the `^contours/\d+$` layers selectively with features from "contours" layer.
 fn fill_contour_layers(lod_layer_names: Vec<String>, collections: &mut HashMap<String, FeatureCollection>) -> anyhow::Result<()> {
 
-    let mut contour_layer = collections.get_mut("contours");
-
-
-
-
+    let contour_layer = collections.get("contours");
 
     let contour_features: FeatureCollection = contour_layer
         .ok_or(anyhow::Error::msg("could not find 'contours' layer"))?
