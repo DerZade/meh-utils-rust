@@ -2,7 +2,6 @@ use std::cmp::Ordering;
 use anyhow::{bail, Error};
 use num_traits::cast::ToPrimitive;
 
-use geo::map_coords::{MapCoordsInplace};
 use geo::{Coordinate, Geometry, LineString, Rect};
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 
@@ -574,14 +573,12 @@ fn build_contours(dem: &DEMRaster, elevation_offset: f32, _: u32, step: usize, c
 
 const TILE_SIZE: u64 = 4096;
 
-fn build_vector_tiles(output_path: &Path, mut collections: Collections, max_lod: u8, world_size: u32) -> anyhow::Result<()> {
+fn build_vector_tiles(output_path: &Path, collections: Collections, max_lod: u8, world_size: u32) -> anyhow::Result<()> {
     let mut projection = ArmaMaxLodTileProjection::new(collections, world_size, max_lod, TILE_SIZE);
 
     for lod in (0..=max_lod).rev() {
         let lod_dir: PathBuf = output_path.join(lod.to_string());
         let _start = Instant::now();
-
-        projection.decrease_lod();
 
 		// simplify layers
         projection.get_collections_mut().par_iter_mut().for_each(|(name, collection)| {
@@ -634,6 +631,8 @@ fn build_vector_tiles(output_path: &Path, mut collections: Collections, max_lod:
         if res.is_err() {
             println!("error when generating vector tiles for lod {}: {}", lod, res.err().unwrap());
         }
+
+        projection.decrease_lod()?;
     }
 
     Ok(())
@@ -724,12 +723,6 @@ fn fill_contour_layers(lod_layer_names: Vec<String>, collections: &mut HashMap<S
         });
     });
     Ok(())
-}
-
-fn project_layers_in_place<F: Fn(&(MvtGeoFloatType, MvtGeoFloatType)) -> (MvtGeoFloatType, MvtGeoFloatType) + Copy>(layers: &mut HashMap<String, FeatureCollection>, transform: F) {
-    for (_, layer) in layers.iter_mut() {
-        layer.map_coords_inplace(transform);
-    }
 }
 
 fn simplify_mounts(_: &mut FeatureCollection, _: f64) {
