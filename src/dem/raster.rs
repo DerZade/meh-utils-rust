@@ -12,6 +12,7 @@ pub struct DEMRaster {
     rows: usize,
     left: f32,
     bottom: f32,
+    /// the DEM resolution: DEM contains one measurement for each cell of area cell_size*cell_size meters²
     cell_size: f32,
     /// the magic value used for "unknown value in this cell"
     no_data_value: f32,
@@ -45,6 +46,10 @@ impl DEMRaster {
             no_data_value,
             data,
         }
+    }
+
+    pub fn get_cell_size(&self) -> f32 {
+        self.cell_size
     }
 
     pub fn dimensions(&self) -> (usize, usize) {

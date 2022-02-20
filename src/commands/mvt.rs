@@ -17,6 +17,7 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 use contour::ContourBuilder;
 use geo::Geometry::Point;
+use geo::map_coords::MapCoordsInplace;
 use geojson::{Feature, PolygonType, Value};
 use mapbox_vector_tile::{Layer, Tile};
 use crate::feature::Feature as CrateFeature;
@@ -115,40 +116,40 @@ mod tests {
         let v = contour_line_to_vec_of_tuple(contour_lines.0.get(0).unwrap());
 
         assert_eq!(v, vec![
-            (5.0, 5.5), (5.0, 4.5), (5.0, 3.5), (5.0, 2.5), (5.0, 1.5),
-            (5.0, 0.5), (4.5, 0.0), (3.5, 0.0), (2.5, 0.0), (1.5, 0.0),
-            (0.5, 0.0), (0.0, 0.5), (0.0, 1.5), (0.0, 2.5), (0.0, 3.5),
-            (0.0, 4.5), (0.0, 5.5), (0.5, 6.0), (1.5, 6.0), (2.5, 6.0),
-            (3.5, 6.0), (4.5, 6.0), (5.0, 5.5)
+            (50.0, 55.0), (50.0, 45.0), (50.0, 35.0), (50.0, 25.0), (50.0, 15.0),
+            (50.0, 05.0), (45.0,  0.0), (35.0,  0.0), (25.0,  0.0), (15.0,  0.0),
+            (05.0,  0.0), ( 0.0, 05.0), ( 0.0, 15.0), ( 0.0, 25.0), ( 0.0, 35.0),
+            ( 0.0, 45.0), ( 0.0, 55.0), (05.0, 60.0), (15.0, 60.0), (25.0, 60.0),
+            (35.0, 60.0), (45.0, 60.0), (50.0, 55.0)
         ]);
 
         let v = contour_line_to_vec_of_tuple(contour_lines.0.get(1).unwrap());
 
         assert_eq!(v, vec![
-            (4.0, 4.5), (4.0, 3.5), (4.0, 2.5), (3.5, 2.0), (3.0, 1.5),
-            (2.5, 1.0), (1.5, 1.0), (1.0, 1.5), (1.0, 2.5), (1.0, 3.5),
-            (1.0, 4.5), (1.5, 5.0), (2.5, 5.0), (3.5, 5.0), (4.0, 4.5)
+            (40.0, 45.0), (40.0, 35.0), (40.0, 25.0), (35.0, 20.0), (30.0, 15.0),
+            (25.0, 10.0), (15.0, 10.0), (10.0, 15.0), (10.0, 25.0), (10.0, 35.0),
+            (10.0, 45.0), (15.0, 50.0), (25.0, 50.0), (35.0, 50.0), (40.0, 45.0)
         ]);
 
         let v = contour_line_to_vec_of_tuple(contour_lines.0.get(2).unwrap());
 
         assert_eq!(v, vec![
-            (3.0, 4.5), (3.5, 4.0), (4.0, 3.5), (3.5, 3.0), (3.0, 2.5),
-            (2.5, 2.0), (1.5, 2.0), (1.0, 2.5), (1.0, 3.5), (1.0, 4.5),
-            (1.5, 5.0), (2.5, 5.0), (3.0, 4.5)
+            (30.0, 45.0), (35.0, 40.0), (40.0, 35.0), (35.0, 30.0), (30.0, 25.0),
+            (25.0, 20.0), (15.0, 20.0), (10.0, 25.0), (10.0, 35.0), (10.0, 45.0),
+            (15.0, 50.0), (25.0, 50.0), (30.0, 45.0)
         ]);
 
         let v = contour_line_to_vec_of_tuple(contour_lines.0.get(3).unwrap());
 
         assert_eq!(v, vec![
-            (2.0, 4.5), (2.0, 3.5), (2.0, 2.5), (1.5, 2.0), (1.0, 2.5),
-            (1.0, 3.5), (1.0, 4.5), (1.5, 5.0), (2.0, 4.5)
+            (20.0, 45.0), (20.0, 35.0), (20.0, 25.0), (15.0, 20.0), (10.0, 25.0),
+            (10.0, 35.0), (10.0, 45.0), (15.0, 50.0), (20.0, 45.0)
         ]);
 
         let v = contour_line_to_vec_of_tuple(contour_lines.0.get(4).unwrap());
 
         assert_eq!(v, vec![
-            (2.0, 3.5), (1.5, 3.0), (1.0, 3.5), (1.5, 4.0), (2.0, 3.5)
+            (20.0, 35.0), (15.0, 30.0), (10.0, 35.0), (15.0, 40.0), (20.0, 35.0)
         ]);
     }
 
@@ -461,7 +462,7 @@ impl MapboxVectorTiles {
         // contour lines
         let now = Instant::now();
         println!("▶️  Building contour lines");
-        build_contours(&dem, meta.elevation_offset, meta.world_size, 10, &mut collections)?;
+        build_contours(&dem, meta.elevation_offset, meta.world_size, 1, &mut collections)?;
         println!("✔️  Built contour lines in {}μs", now.elapsed().as_micros());
 
         // build mounts
@@ -520,6 +521,9 @@ fn calc_max_lod (_world_size: NonZeroUsize) -> usize {
 
 fn build_contours(dem: &DEMRaster, elevation_offset: f32, _: NonZeroUsize, step: usize, collections: &mut Collections) -> anyhow::Result<()> {
     let cmp = |a: &&f64, b: &&f64| -> Ordering {a.partial_cmp(b).unwrap()};
+    let cell_size = dem.get_cell_size();
+
+    let expand_by_cell_size = |(a, b): &(f32, f32)| -> (f32, f32) {(a * cell_size, b * cell_size)};
 
     let no_data_value: f64 = dem.get_no_data_value().to_f64().unwrap();
     let dem64 = dem
@@ -530,7 +534,7 @@ fn build_contours(dem: &DEMRaster, elevation_offset: f32, _: NonZeroUsize, step:
 
 
     let min_elevation = dem64.iter().filter(|x| {*x != &no_data_value}).min_by(cmp).map(|f| {f.to_i64().unwrap()}).ok_or(anyhow::Error::msg("no values in DEM raster"))?;
-    let max_elevation = dem64.iter().filter(|x| {*x != &no_data_value}).max_by(|a, b| -> Ordering {a.partial_cmp(b).unwrap()}).map(|f| {f.to_i64().unwrap()}).ok_or(anyhow::Error::msg("no values in DEM raster"))?;
+    let max_elevation = dem64.iter().filter(|x| {*x != &no_data_value}).max_by(cmp).map(|f| {f.to_i64().unwrap()}).ok_or(anyhow::Error::msg("no values in DEM raster"))?;
     // hmm how do we use worldsize? do we?
 
     let builder = ContourBuilder::new(dem.dimensions().0 as u32, dem.dimensions().1 as u32, false);
@@ -542,9 +546,13 @@ fn build_contours(dem: &DEMRaster, elevation_offset: f32, _: NonZeroUsize, step:
     println!("elevation offset: {}", elevation_offset);
 
     let res = builder.contours(&dem64, &thresholds).map(|features: Vec<Feature>| {
-        let foo: Vec<CrateFeature> = features.into_iter().filter_map(|f| {
+        let mut foo: Vec<CrateFeature> = features.into_iter().filter_map(|f| {
             try_from_geojson_feature_for_crate_feature(f).ok()
         }).collect();
+
+        foo.iter_mut().for_each(|feature| {
+            feature.map_coords_inplace(expand_by_cell_size);
+        });
 
         collections.insert(String::from("contours"), FeatureCollection(foo));
         ()
