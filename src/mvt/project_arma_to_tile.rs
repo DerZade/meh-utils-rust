@@ -1,3 +1,4 @@
+use std::num::NonZeroUsize;
 use geo::map_coords::MapCoordsInplace;
 use num_traits::ToPrimitive;
 use crate::mvt::{Collections, MvtGeoFloatType};
@@ -5,6 +6,7 @@ use crate::mvt::{Collections, MvtGeoFloatType};
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
+    use std::num::NonZeroUsize;
     use crate::feature::{Feature, FeatureCollection};
     use crate::mvt::{ArmaMaxLodTileProjection, Collections, MvtGeoFloatType};
     use crate::mvt::project_arma_to_tile::LodProjection;
@@ -31,13 +33,13 @@ mod tests {
         ];
         collections.0.insert("foo".to_string(), FeatureCollection(features));
 
-        let proj = ArmaMaxLodTileProjection::new(collections, 1024, 3, 2048);
+        let proj = ArmaMaxLodTileProjection::new(collections, NonZeroUsize::new(1024).unwrap(), 3, 2048);
 
         assert_point_geometry(&proj, &16.0, &16352.0);
 
         assert_eq!(proj.max_lod, 3);
         assert_eq!(proj.current_lod, 3);
-        assert_eq!(proj.world_size, 1024);
+        assert_eq!(proj.world_size, NonZeroUsize::new(1024).unwrap());
         assert_eq!(proj.tile_size, 2048);
     }
 
@@ -53,7 +55,7 @@ mod tests {
         ];
         collections.0.insert("foo".to_string(), FeatureCollection(features));
 
-        let mut proj = ArmaMaxLodTileProjection::new(collections, 1024, 3, 2048);
+        let mut proj = ArmaMaxLodTileProjection::new(collections, NonZeroUsize::new(1024).unwrap(), 3, 2048);
 
         assert_eq!(proj.get_lod(), 3);
 
@@ -79,7 +81,7 @@ mod tests {
 pub struct ArmaMaxLodTileProjection {
     collections: Collections,
     /// Arma3 world size: edge length in meters
-    world_size: u32,
+    world_size: NonZeroUsize,
     /// max zoom level we want to have on the tiled map
     max_lod: usize,
     /// tile size in pixels
@@ -87,8 +89,8 @@ pub struct ArmaMaxLodTileProjection {
     current_lod: usize,
 }
 impl ArmaMaxLodTileProjection {
-    pub fn new(mut collections: Collections, world_size: u32, max_lod: usize, tile_size: u64, ) -> Self {
-        let world_size_f32 = world_size as f32;
+    pub fn new(mut collections: Collections, world_size: NonZeroUsize, max_lod: usize, tile_size: u64, ) -> Self {
+        let world_size_f32 = world_size.get() as f32;
         let tiles_per_dimension = 2_u32.pow(max_lod.to_u32().unwrap());
         let pixels = tiles_per_dimension as u64 * tile_size;
         let factor = pixels as f32 / world_size_f32;

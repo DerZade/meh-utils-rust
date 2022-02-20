@@ -340,11 +340,16 @@ impl<T: ClipFloat> Clip<T> for Geometry<T> {
             Geometry::Line(l) => l.clip(rect).map(|l| {Geometry::Line(l)}),
             Geometry::Polygon(pg) => pg.clip(rect).map(|pg| {Geometry::MultiPolygon(pg)}),
             Geometry::MultiPolygon(mpg) => {
-                let polys = mpg
+                let mut pgv: Vec<Polygon<T>> = vec![];
+                mpg
                     .iter()
-                    .filter_map(|pg| { pg.clip(rect)});
-
-                Some(Geometry::MultiPolygon(polys.flatten().collect()))
+                    .for_each(|pg| {
+                        pg.clip(rect).into_iter().for_each(|mpg: MultiPolygon<T>| {
+                            let mut vec = mpg.0;
+                            pgv.append(&mut vec)
+                        })
+                    });
+                Some(Geometry::MultiPolygon(MultiPolygon(pgv)))
             },
             _ => None,
         }
@@ -435,7 +440,8 @@ impl<T: ClipFloat> Clip<T> for Polygon<T> {
     fn clip(&self, rect: &Rect<T>) -> Option<Self::Output> {
         let map_f64 = |(a, b): &(T, T)| {(a.to_f64().unwrap(), b.to_f64().unwrap())};
         let rect_poly = rect.to_polygon().map_coords(map_f64);
-        let clipped = rect_poly.intersection(&self.map_coords(map_f64), 100.0);
+        let self_f64 = self.map_coords(map_f64);
+        let clipped = rect_poly.intersection(&self_f64, 100.0);
         if clipped.0.is_empty() {
             None
         } else {

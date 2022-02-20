@@ -1,5 +1,6 @@
 use std::fs::File;
 use std::io::{BufReader, Error, ErrorKind};
+use std::num::NonZeroUsize;
 use std::path::Path;
 
 use serde::Deserialize;
@@ -31,7 +32,7 @@ pub struct MetaJSON {
     pub color_outside: Option<[f32; 4]>,
     pub version: f32,
     pub world_name: String,
-    pub world_size: u32,
+    pub world_size: NonZeroUsize,
 }
 
 pub trait MetaJsonParser {
@@ -55,7 +56,7 @@ impl MetaJsonParser for DummyMetaJsonParser {
                 color_outside: None,
                 version: 0.1,
                 world_name: "world_name".to_string(),
-                world_size: 0,
+                world_size: NonZeroUsize::new(1024).unwrap(),
             })
         } else {
             Err(Box::new(std::io::Error::new(ErrorKind::Other, "dummy error")))
@@ -116,7 +117,7 @@ mod tests {
         assert!(res.is_ok());
         let meta = res.unwrap();
         assert_eq!("Bohemia Interactive", meta.author);
-        assert_eq!(2048, meta.world_size);
+        assert_eq!(2048, meta.world_size.get());
     }
 
     #[test]

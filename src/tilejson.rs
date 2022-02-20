@@ -8,6 +8,7 @@ use crate::metajson::MetaJSON;
 #[cfg(test)]
 mod tests {
     use std::fs::{read_to_string};
+    use std::num::NonZeroUsize;
     use crate::metajson::MetaJSON;
     use crate::test::with_input_and_output_paths;
     use crate::tilejson::write;
@@ -31,7 +32,7 @@ mod tests {
                     color_outside: None,
                     version: 5.0,
                     world_name: "world_name".to_string(),
-                    world_size: 6,
+                    world_size: NonZeroUsize::new(6).unwrap(),
                 },
                 "type_display_name",
                 &Vec::new()

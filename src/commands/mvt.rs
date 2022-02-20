@@ -10,6 +10,7 @@ use crate::feature::{FeatureCollection, Simplifiable};
 use crate::mvt::{load_geo_jsons, build_mounts, find_lod_layers, MvtGeoFloatType, ArmaMaxLodTileProjection, Collections, LodProjection};
 
 use std::collections::HashMap;
+use std::num::NonZeroUsize;
 use std::ops::{Add};
 use std::path::{Path, PathBuf};
 
@@ -27,6 +28,7 @@ const DEFAULT_EXTENT: u16 = 4096;
 #[allow(unused_must_use)]
 mod tests {
     use std::collections::HashMap;
+    use std::num::NonZeroUsize;
     use std::path::Path;
     use geo::{Coordinate};
     use geojson::{Geometry, Value};
@@ -65,7 +67,7 @@ mod tests {
             1.0, 7.0,
         ]);
         let mut collections: Collections = Collections::new();
-        let res = build_contours(&raster, 0.0, 2, 2, &mut collections);
+        let res = build_contours(&raster, 0.0, NonZeroUsize::new(2).unwrap(), 2, &mut collections);
 
         assert!(res.is_ok());
 
@@ -102,7 +104,7 @@ mod tests {
         ]);
         let mut collections: Collections = Collections::new();
 
-        let res = build_contours(&raster, 50.0, 2048, 2, &mut collections);
+        let res = build_contours(&raster, 50.0, NonZeroUsize::new(2048).unwrap(), 2, &mut collections);
 
         assert!(res.is_ok());
         assert!(collections.contains_key("contours"));
@@ -210,7 +212,7 @@ mod tests {
     #[test]
     fn build_vector_tiles_does_not_explode_on_empty_input() {
         with_input_and_output_paths(|_, output_path| {
-            let res = build_vector_tiles(&output_path, Collections::new(), 1, 1);
+            let res = build_vector_tiles(&output_path, Collections::new(), 1, NonZeroUsize::new(1).unwrap());
 
             assert!(res.is_ok());
         });
@@ -285,7 +287,7 @@ mod tests {
             let mut layers = collections_with_layers(vec!["bar"]);
 
             let lod_path = output_path.join("11");
-            let res = build_lod_vector_tiles(&mut layers, 4096, 2, &lod_path);
+            let res = build_lod_vector_tiles(&mut layers, NonZeroUsize::new(4096).unwrap(), 2, &lod_path);
 
             assert!(res.is_ok());
             assert!(output_path.is_dir());
@@ -508,7 +510,7 @@ impl MapboxVectorTiles {
 }
 
 
-fn calc_max_lod (_world_size: u32) -> usize {
+fn calc_max_lod (_world_size: NonZeroUsize) -> usize {
     // TODO
     println!("TODO: calc_max_lod is a stub that returns 5");
     5
@@ -516,7 +518,7 @@ fn calc_max_lod (_world_size: u32) -> usize {
 
 
 
-fn build_contours(dem: &DEMRaster, elevation_offset: f32, _: u32, step: usize, collections: &mut Collections) -> anyhow::Result<()> {
+fn build_contours(dem: &DEMRaster, elevation_offset: f32, _: NonZeroUsize, step: usize, collections: &mut Collections) -> anyhow::Result<()> {
     let cmp = |a: &&f64, b: &&f64| -> Ordering {a.partial_cmp(b).unwrap()};
 
     let no_data_value: f64 = dem.get_no_data_value().to_f64().unwrap();
@@ -563,7 +565,7 @@ fn build_contours(dem: &DEMRaster, elevation_offset: f32, _: u32, step: usize, c
 
 const TILE_SIZE: u64 = 4096;
 
-fn build_vector_tiles(output_path: &Path, collections: Collections, max_lod: usize, world_size: u32) -> anyhow::Result<()> {
+fn build_vector_tiles(output_path: &Path, collections: Collections, max_lod: usize, world_size: NonZeroUsize) -> anyhow::Result<()> {
     let mut projection = ArmaMaxLodTileProjection::new(collections, world_size, max_lod, TILE_SIZE);
 
     let mut projection_lod = Ok(max_lod);
@@ -650,7 +652,7 @@ fn create_tile(col: u16, row: u16, collections: &mut HashMap<String, FeatureColl
     Ok(Tile::from_layers(layers))
 }
 
-fn build_lod_vector_tiles(collections: &mut HashMap<String, FeatureCollection>, world_size: u32, lod: usize, lod_dir: &PathBuf) -> anyhow::Result<()> {
+fn build_lod_vector_tiles(collections: &mut HashMap<String, FeatureCollection>, world_size: NonZeroUsize, lod: usize, lod_dir: &PathBuf) -> anyhow::Result<()> {
     println!("build_lod_vector_tiles with {} collections, worldsize {} and lod {} into {}", collections.len(), world_size, lod, lod_dir.to_str().unwrap_or("WAT"));
 
     fn ensure_directory(dir: &PathBuf) -> Result<(), Error>{
