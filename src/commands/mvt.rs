@@ -462,7 +462,7 @@ impl MapboxVectorTiles {
         // contour lines
         let now = Instant::now();
         println!("▶️  Building contour lines");
-        build_contours(&dem, meta.elevation_offset, meta.world_size, 1, &mut collections)?;
+        build_contours(&dem, meta.elevation_offset, meta.world_size, 10, &mut collections)?;
         println!("✔️  Built contour lines in {}μs", now.elapsed().as_micros());
 
         // build mounts
@@ -510,14 +510,11 @@ impl MapboxVectorTiles {
     }
 }
 
-
 fn calc_max_lod (_world_size: NonZeroUsize) -> usize {
     // TODO
     println!("TODO: calc_max_lod is a stub that returns 5");
     5
 }
-
-
 
 fn build_contours(dem: &DEMRaster, elevation_offset: f32, _: NonZeroUsize, step: usize, collections: &mut Collections) -> anyhow::Result<()> {
     let cmp = |a: &&f64, b: &&f64| -> Ordering {a.partial_cmp(b).unwrap()};
