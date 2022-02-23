@@ -520,8 +520,6 @@ fn build_contours(dem: &DEMRaster, elevation_offset: f32, _: NonZeroUsize, colle
     let cmp = |a: &&f64, b: &&f64| -> Ordering {a.partial_cmp(b).unwrap()};
     let cell_size = dem.get_cell_size();
 
-    let step = 1;
-
     let expand_by_cell_size = |(a, b): &(f32, f32)| -> (f32, f32) {(a * cell_size, b * cell_size)};
 
     let no_data_value: f64 = dem.get_no_data_value().to_f64().unwrap();
@@ -532,17 +530,15 @@ fn build_contours(dem: &DEMRaster, elevation_offset: f32, _: NonZeroUsize, colle
         .collect::<Vec<f64>>();
 
 
-    let min_elevation = dem64.iter().filter(|x| {*x != &no_data_value}).min_by(cmp).map(|f| {f.to_i64().unwrap()}).ok_or(anyhow::Error::msg("no values in DEM raster"))?;
-    let max_elevation = dem64.iter().filter(|x| {*x != &no_data_value}).max_by(cmp).map(|f| {f.to_i64().unwrap()}).ok_or(anyhow::Error::msg("no values in DEM raster"))?;
+    let min_elevation = dem64.iter().filter(|x| {*x != &no_data_value}).min_by(cmp).ok_or(anyhow::Error::msg("no values in DEM raster"))?;
+    let max_elevation = dem64.iter().filter(|x| {*x != &no_data_value}).max_by(cmp).ok_or(anyhow::Error::msg("no values in DEM raster"))?;
     // hmm how do we use worldsize? do we?
 
     let builder = ContourBuilder::new(dem.dimensions().0 as u32, dem.dimensions().1 as u32, false);
-    let thresholds: Vec<f64> = (min_elevation..=max_elevation).step_by(step).map(|i| {i as f64}).collect();
+    let thresholds: Vec<f64> = (min_elevation.to_i64().unwrap() ..=max_elevation.to_i64().unwrap()).map(|f| {f.to_f64().unwrap()}).collect();
 
-    println!("## contour builder ##");
-    println!("dimensions: {} by {}", dem.dimensions().0 as u32, dem.dimensions().1 as u32);
-    println!("all thresholds: {}", thresholds.iter().map(|f| {f.to_string()}).collect::<Vec<String>>().join(" "));
-    println!("elevation offset: {}", elevation_offset);
+    println!("contour builder: dimensions {} by {}", dem.dimensions().0 as u32, dem.dimensions().1 as u32);
+    println!("contour builder: elevation min {}, max {}, offset {}",  min_elevation, max_elevation, elevation_offset);
 
     let res = builder.contours(&dem64, &thresholds).map(|features: Vec<Feature>| {
         let mut foo: Vec<CrateFeature> = features.into_iter().filter_map(|f| {
