@@ -37,7 +37,8 @@ mod tests {
     use geojson::Value::{MultiPolygon};
     use mapbox_vector_tile::Tile;
     use rand::{Rng, thread_rng};
-    use crate::commands::mvt::{build_contours, build_lod_vector_tiles, build_vector_tiles, create_tile, fill_contour_layers, MapboxVectorTiles, try_from_geojson_feature_for_crate_feature, try_from_geojson_value_for_geo_geometry, vec_f64_to_coordinate_f32};
+    use rstest::rstest;
+    use crate::commands::mvt::{build_contours, build_lod_vector_tiles, build_vector_tiles, calc_max_lod, create_tile, fill_contour_layers, MapboxVectorTiles, try_from_geojson_feature_for_crate_feature, try_from_geojson_value_for_geo_geometry, vec_f64_to_coordinate_f32};
     use crate::dem::{DEMRaster, Origin};
     use crate::feature::{Feature as CrateFeature, FeatureCollection};
     use crate::metajson::DummyMetaJsonParser;
@@ -368,7 +369,17 @@ mod tests {
         assert!(tile_res.is_ok());
 
         tile_has_point_at(&tile_res.unwrap(), 5000 - 4096, 5000 - 4096);
+    }
 
+    #[rstest]
+    #[case(256, 4096, 0)]
+    #[case(512, 4096, 1)]
+    #[case(1024, 4096, 2)]
+    #[case(2048, 4096, 3)]
+    fn calc_max_lod_returns_good_values(#[case] world_size: usize, #[case] tile_size: usize, #[case] expected_lod: usize) {
+        let res_lod = calc_max_lod(NonZeroUsize::new(world_size).unwrap(), tile_size);
+        assert!(res_lod.is_ok());
+        assert_eq!(res_lod.unwrap(), expected_lod);
     }
 }
 
@@ -486,7 +497,7 @@ impl MapboxVectorTiles {
         layer_names.sort();
         println!("ℹ️  Loaded the following layers ({}): {}", layer_names.len(), layer_names.join(", "));
 
-        let max_lod = calc_max_lod(meta.world_size);
+        let max_lod = calc_max_lod(meta.world_size, DEFAULT_EXTENT.to_usize().unwrap())?;
         println!("ℹ️  Calculated max lod: {}", max_lod);
 
         // build MVTs
@@ -510,10 +521,11 @@ impl MapboxVectorTiles {
     }
 }
 
-fn calc_max_lod (_world_size: NonZeroUsize) -> usize {
-    // TODO
-    println!("TODO: calc_max_lod is a stub that returns 5");
-    5
+fn calc_max_lod(world_size: NonZeroUsize, tile_size: usize) -> anyhow::Result<usize> {
+    // lets say we want a resolution of 10cm, that is 10_000px/km. tiles are 4096px, so going from world_size that would be
+    let tile_size_f64 = tile_size.to_f64().ok_or(anyhow::Error::msg(format!("could not convert {} to f64", tile_size)))?;
+    let world_size_f64 = (world_size).get().to_f64().ok_or(anyhow::Error::msg(format!("could not convert {} to f64", world_size)))?;
+    (world_size_f64 * 10.0_f64 / tile_size_f64).max(1.0_f64).log2().ceil().to_usize().ok_or(anyhow::Error::msg("could not convert to usize. Negative value?"))
 }
 
 fn build_contours(dem: &DEMRaster, elevation_offset: f32, _: NonZeroUsize, collections: &mut Collections) -> anyhow::Result<()> {
@@ -573,6 +585,8 @@ fn build_vector_tiles(output_path: &Path, collections: Collections, max_lod: usi
 
     let mut projection_lod = Ok(max_lod);
     while let Ok(lod) = projection_lod {
+        let now = Instant::now();
+
         let lod_dir: PathBuf = output_path.join(lod.to_string());
 
 		// simplify layers
@@ -626,6 +640,12 @@ fn build_vector_tiles(output_path: &Path, collections: Collections, max_lod: usi
         build_lod_vector_tiles(projection.get_collections_mut(), world_size, lod, &lod_dir).unwrap_or_else(|err| {
             println!("error when generating vector tiles for lod {}: {}", lod, err);
         });
+
+        println!(
+            "✔️  Built mapbox vector tiles LOD {} in {}μs",
+            lod,
+            now.elapsed().as_micros()
+        );
 
         projection_lod = projection.decrease_lod();
     }
