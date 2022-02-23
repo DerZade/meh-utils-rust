@@ -53,7 +53,7 @@ mod tests {
     }
 
     #[test]
-    fn runs_successfully() {
+    fn exec_runs_successfully() {
         with_input_and_output_paths(|_, output_path| {
             let input_path = Path::new("./resources/test/happy/input").to_path_buf();
             let result =  (MapboxVectorTiles::new(Box::new(DummyMetaJsonParser { succeeds: true }))).exec(&input_path, &output_path);
@@ -68,7 +68,7 @@ mod tests {
             1.0, 7.0,
         ]);
         let mut collections: Collections = Collections::new();
-        let res = build_contours(&raster, 0.0, NonZeroUsize::new(2).unwrap(), 2, &mut collections);
+        let res = build_contours(&raster, 0.0, NonZeroUsize::new(2).unwrap(), &mut collections);
 
         assert!(res.is_ok());
 
@@ -105,12 +105,12 @@ mod tests {
         ]);
         let mut collections: Collections = Collections::new();
 
-        let res = build_contours(&raster, 50.0, NonZeroUsize::new(2048).unwrap(), 2, &mut collections);
+        let res = build_contours(&raster, 50.0, NonZeroUsize::new(2048).unwrap(), &mut collections);
 
         assert!(res.is_ok());
         assert!(collections.contains_key("contours"));
         let contour_lines: &FeatureCollection = collections.get("contours").unwrap();
-        assert_eq!(contour_lines.len(), 5);
+        assert_eq!(contour_lines.len(), 10);
         println!("ookay collection: {}", collections.get("contours").unwrap().0.len());
 
         let v = contour_line_to_vec_of_tuple(contour_lines.0.get(0).unwrap());
@@ -123,7 +123,7 @@ mod tests {
             (35.0, 60.0), (45.0, 60.0), (50.0, 55.0)
         ]);
 
-        let v = contour_line_to_vec_of_tuple(contour_lines.0.get(1).unwrap());
+        let v = contour_line_to_vec_of_tuple(contour_lines.0.get(2).unwrap());
 
         assert_eq!(v, vec![
             (40.0, 45.0), (40.0, 35.0), (40.0, 25.0), (35.0, 20.0), (30.0, 15.0),
@@ -131,7 +131,7 @@ mod tests {
             (10.0, 45.0), (15.0, 50.0), (25.0, 50.0), (35.0, 50.0), (40.0, 45.0)
         ]);
 
-        let v = contour_line_to_vec_of_tuple(contour_lines.0.get(2).unwrap());
+        let v = contour_line_to_vec_of_tuple(contour_lines.0.get(4).unwrap());
 
         assert_eq!(v, vec![
             (30.0, 45.0), (35.0, 40.0), (40.0, 35.0), (35.0, 30.0), (30.0, 25.0),
@@ -139,14 +139,14 @@ mod tests {
             (15.0, 50.0), (25.0, 50.0), (30.0, 45.0)
         ]);
 
-        let v = contour_line_to_vec_of_tuple(contour_lines.0.get(3).unwrap());
+        let v = contour_line_to_vec_of_tuple(contour_lines.0.get(6).unwrap());
 
         assert_eq!(v, vec![
             (20.0, 45.0), (20.0, 35.0), (20.0, 25.0), (15.0, 20.0), (10.0, 25.0),
             (10.0, 35.0), (10.0, 45.0), (15.0, 50.0), (20.0, 45.0)
         ]);
 
-        let v = contour_line_to_vec_of_tuple(contour_lines.0.get(4).unwrap());
+        let v = contour_line_to_vec_of_tuple(contour_lines.0.get(8).unwrap());
 
         assert_eq!(v, vec![
             (20.0, 35.0), (15.0, 30.0), (10.0, 35.0), (15.0, 40.0), (20.0, 35.0)
@@ -462,7 +462,7 @@ impl MapboxVectorTiles {
         // contour lines
         let now = Instant::now();
         println!("▶️  Building contour lines");
-        build_contours(&dem, meta.elevation_offset, meta.world_size, 10, &mut collections)?;
+        build_contours(&dem, meta.elevation_offset, meta.world_size, &mut collections)?;
         println!("✔️  Built contour lines in {}μs", now.elapsed().as_micros());
 
         // build mounts
@@ -516,9 +516,11 @@ fn calc_max_lod (_world_size: NonZeroUsize) -> usize {
     5
 }
 
-fn build_contours(dem: &DEMRaster, elevation_offset: f32, _: NonZeroUsize, step: usize, collections: &mut Collections) -> anyhow::Result<()> {
+fn build_contours(dem: &DEMRaster, elevation_offset: f32, _: NonZeroUsize, collections: &mut Collections) -> anyhow::Result<()> {
     let cmp = |a: &&f64, b: &&f64| -> Ordering {a.partial_cmp(b).unwrap()};
     let cell_size = dem.get_cell_size();
+
+    let step = 1;
 
     let expand_by_cell_size = |(a, b): &(f32, f32)| -> (f32, f32) {(a * cell_size, b * cell_size)};
 
