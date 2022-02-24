@@ -9,6 +9,7 @@ use crate::metajson::MetaJSON;
 mod tests {
     use std::fs::{read_to_string};
     use std::num::NonZeroUsize;
+    use std::ops::Add;
     use crate::metajson::MetaJSON;
     use crate::test::with_input_and_output_paths;
     use crate::tilejson::write;
@@ -35,7 +36,8 @@ mod tests {
                     world_size: NonZeroUsize::new(6).unwrap(),
                 },
                 "type_display_name",
-                &Vec::new()
+                &Vec::new(),
+                "https://localhost:3000/".to_string().add("{z}/{x}/{y}.png")
             );
 
             assert!(res.is_ok());
@@ -71,6 +73,7 @@ pub struct TileJSON {
     pub minzoom: usize,
     pub maxzoom: usize,
     pub vector_layers: Option<Vec<TileJSONLayer>>,
+    pub tiles: Vec<String>
 }
 
 pub fn write(
@@ -79,6 +82,7 @@ pub fn write(
     meta: MetaJSON,
     type_display_name: &str,
     vector_layer_names: &Vec<String>,
+    tile_uri: String,
 ) -> Result<(), Error> {
     let vector_layers: Vec<_> = vector_layer_names
         .iter()
@@ -101,6 +105,7 @@ pub fn write(
         minzoom: 0,
         maxzoom: max_lod.into(),
         vector_layers: Some(vector_layers),
+        tiles: vec![tile_uri]
     };
 
     let mut file = File::create(dir.join("tile.json"))?;

@@ -512,7 +512,7 @@ impl MapboxVectorTiles {
         // tile.json
         let now = Instant::now();
         println!("▶️  Creating tile.json");
-        crate::tilejson::write(output_path, max_lod, meta, "Mapbox Vector", &layer_names)?;
+        crate::tilejson::write(output_path, max_lod, meta, "Mapbox Vector", &layer_names, "https://localhost/".to_string())?;
         println!("✔️  Created tile.json in {}μs", now.elapsed().as_micros());
 
         println!("\n    🎉  Finished in {}μs", start.elapsed().as_micros());

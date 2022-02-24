@@ -39,8 +39,6 @@ mod tests {
 
         assert_eq!(proj.max_lod, 3);
         assert_eq!(proj.current_lod, 3);
-        assert_eq!(proj.world_size, NonZeroUsize::new(1024).unwrap());
-        assert_eq!(proj.tile_size, 2048);
     }
 
     #[test]
@@ -80,12 +78,8 @@ mod tests {
 
 pub struct ArmaMaxLodTileProjection {
     collections: Collections,
-    /// Arma3 world size: edge length in meters
-    world_size: NonZeroUsize,
     /// max zoom level we want to have on the tiled map
     max_lod: usize,
-    /// tile size in pixels
-    tile_size: u64,
     current_lod: usize,
 }
 impl ArmaMaxLodTileProjection {
@@ -100,7 +94,7 @@ impl ArmaMaxLodTileProjection {
                 (world_size_f32 - *y) * factor,
             )
         });
-        ArmaMaxLodTileProjection {collections, world_size, max_lod, tile_size, current_lod: max_lod.into()}
+        ArmaMaxLodTileProjection {collections, max_lod, current_lod: max_lod.into()}
     }
 }
 
