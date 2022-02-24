@@ -1,3 +1,4 @@
+use std::ops::Add;
 use anyhow::bail;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
@@ -47,7 +48,7 @@ impl Sat {
 
         let now = Instant::now();
         println!("▶️  Creating tile.json");
-        crate::tilejson::write(output_path, max_lod, meta, "Satellite", &Vec::new(), "https://localhost/".to_string())?;
+        crate::tilejson::write(output_path, max_lod, meta, "Satellite", &Vec::new(), "https://localhost/".to_string().add("{z}/{x}/{y}.png"))?;
         println!("✔️  Created tile.json in {}ms", now.elapsed().as_millis());
 
         println!("\n    🎉  Finished in {}ms", start.elapsed().as_millis());
