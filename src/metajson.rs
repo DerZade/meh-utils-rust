@@ -30,7 +30,7 @@ pub struct MetaJSON {
     pub latitude: f32,
     pub longitude: f32,
     pub color_outside: Option<[f32; 4]>,
-    pub version: f32,
+    pub version: String,
     pub world_name: String,
     pub world_size: NonZeroUsize,
 }
@@ -54,7 +54,7 @@ impl MetaJsonParser for DummyMetaJsonParser {
                 latitude: 0.0,
                 longitude: 0.0,
                 color_outside: None,
-                version: 0.1,
+                version: "0.1".to_string(),
                 world_name: "world_name".to_string(),
                 world_size: NonZeroUsize::new(1024).unwrap(),
             })

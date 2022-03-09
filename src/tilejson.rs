@@ -31,7 +31,7 @@ mod tests {
                     latitude: 3.0,
                     longitude: 4.0,
                     color_outside: None,
-                    version: 5.0,
+                    version: "5.0".to_string(),
                     world_name: "world_name".to_string(),
                     world_size: NonZeroUsize::new(6).unwrap(),
                 },
