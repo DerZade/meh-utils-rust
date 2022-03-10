@@ -528,11 +528,11 @@ fn calc_max_lod(world_size: NonZeroUsize, tile_size: usize) -> anyhow::Result<us
     (world_size_f64 * 10.0_f64 / tile_size_f64).max(1.0_f64).log2().ceil().to_usize().ok_or(anyhow::Error::msg("could not convert to usize. Negative value?"))
 }
 
-fn build_contours(dem: &DEMRaster, elevation_offset: f32, _: NonZeroUsize, collections: &mut Collections) -> anyhow::Result<()> {
+fn build_contours(dem: &DEMRaster, elevation_offset: f32, world_size: NonZeroUsize, collections: &mut Collections) -> anyhow::Result<()> {
     let cmp = |a: &&f64, b: &&f64| -> Ordering {a.partial_cmp(b).unwrap()};
     let cell_size = dem.get_cell_size();
 
-    let expand_by_cell_size = |(a, b): &(f32, f32)| -> (f32, f32) {(a * cell_size, b * cell_size)};
+    let expand_by_cell_size = |(a, b): &(f32, f32)| -> (f32, f32) {(a * cell_size, world_size.get().to_f32().unwrap() - (b * cell_size))};
 
     let no_data_value: f64 = dem.get_no_data_value().to_f64().unwrap();
     let dem64 = dem
