@@ -63,7 +63,7 @@ mod tests {
     }
 
     #[test]
-    fn build_contours_creates_empty_contour_layers_for_1_5_10_50_100() {
+    fn build_contours_creates_empty_contour_layers_for_5_10_50_100() {
         let raster = DEMRaster::new(2, 2, Origin::Corner(0.0, 0.0), 1.0, -9999.99, vec![
             0.0, 6.0,
             1.0, 7.0,
@@ -74,12 +74,15 @@ mod tests {
         assert!(res.is_ok());
 
         vec![
-          "contours/1", "contours/5", "contours/10", "contours/50", "contours/100"
+            "contours/5", "contours/10", "contours/50", "contours/100"
         ].into_iter().for_each(|k| {
             let layer = collections.get(k);
             assert!(layer.is_some(), "no layer {}!", k);
             assert_eq!(0, layer.unwrap().0.len());
         });
+        let layer1 = collections.get("contours/1");
+        assert!(layer1.is_some());
+        assert_eq!(layer1.unwrap().0.len(), 8);
     }
 
     #[test]
@@ -109,49 +112,30 @@ mod tests {
         let res = build_contours(&raster, 50.0, NonZeroUsize::new(2048).unwrap(), &mut collections);
 
         assert!(res.is_ok());
-        assert!(collections.contains_key("contours"));
-        let contour_lines: &FeatureCollection = collections.get("contours").unwrap();
+        assert!(collections.contains_key("contours/1"));
+        let contour_lines: &FeatureCollection = collections.get("contours/1").unwrap();
         assert_eq!(contour_lines.len(), 10);
-        println!("ookay collection: {}", collections.get("contours").unwrap().0.len());
+        println!("ookay collection: {}", collections.get("contours/1").unwrap().0.len());
 
         let v = contour_line_to_vec_of_tuple(contour_lines.0.get(0).unwrap());
 
-        assert_eq!(v, vec![
-            (50.0, 55.0), (50.0, 45.0), (50.0, 35.0), (50.0, 25.0), (50.0, 15.0),
-            (50.0, 05.0), (45.0,  0.0), (35.0,  0.0), (25.0,  0.0), (15.0,  0.0),
-            (05.0,  0.0), ( 0.0, 05.0), ( 0.0, 15.0), ( 0.0, 25.0), ( 0.0, 35.0),
-            ( 0.0, 45.0), ( 0.0, 55.0), (05.0, 60.0), (15.0, 60.0), (25.0, 60.0),
-            (35.0, 60.0), (45.0, 60.0), (50.0, 55.0)
-        ]);
+        assert_eq!(v, vec![(50.0, 1993.0), (50.0, 2003.0), (50.0, 2013.0), (50.0, 2023.0), (50.0, 2033.0), (50.0, 2043.0), (45.0, 2048.0), (35.0, 2048.0), (25.0, 2048.0), (15.0, 2048.0), (5.0, 2048.0), (0.0, 2043.0), (0.0, 2033.0), (0.0, 2023.0), (0.0, 2013.0), (0.0, 2003.0), (0.0, 1993.0), (5.0, 1988.0), (15.0, 1988.0), (25.0, 1988.0), (35.0, 1988.0), (45.0, 1988.0), (50.0, 1993.0)]);
 
         let v = contour_line_to_vec_of_tuple(contour_lines.0.get(2).unwrap());
 
-        assert_eq!(v, vec![
-            (40.0, 45.0), (40.0, 35.0), (40.0, 25.0), (35.0, 20.0), (30.0, 15.0),
-            (25.0, 10.0), (15.0, 10.0), (10.0, 15.0), (10.0, 25.0), (10.0, 35.0),
-            (10.0, 45.0), (15.0, 50.0), (25.0, 50.0), (35.0, 50.0), (40.0, 45.0)
-        ]);
+        assert_eq!(v, vec![(40.0, 2003.0), (40.0, 2013.0), (40.0, 2023.0), (35.0, 2028.0), (30.0, 2033.0), (25.0, 2038.0), (15.0, 2038.0), (10.0, 2033.0), (10.0, 2023.0), (10.0, 2013.0), (10.0, 2003.0), (15.0, 1998.0), (25.0, 1998.0), (35.0, 1998.0), (40.0, 2003.0)]);
 
         let v = contour_line_to_vec_of_tuple(contour_lines.0.get(4).unwrap());
 
-        assert_eq!(v, vec![
-            (30.0, 45.0), (35.0, 40.0), (40.0, 35.0), (35.0, 30.0), (30.0, 25.0),
-            (25.0, 20.0), (15.0, 20.0), (10.0, 25.0), (10.0, 35.0), (10.0, 45.0),
-            (15.0, 50.0), (25.0, 50.0), (30.0, 45.0)
-        ]);
+        assert_eq!(v, vec![(30.0, 2003.0), (35.0, 2008.0), (40.0, 2013.0), (35.0, 2018.0), (30.0, 2023.0), (25.0, 2028.0), (15.0, 2028.0), (10.0, 2023.0), (10.0, 2013.0), (10.0, 2003.0), (15.0, 1998.0), (25.0, 1998.0), (30.0, 2003.0)]);
 
         let v = contour_line_to_vec_of_tuple(contour_lines.0.get(6).unwrap());
 
-        assert_eq!(v, vec![
-            (20.0, 45.0), (20.0, 35.0), (20.0, 25.0), (15.0, 20.0), (10.0, 25.0),
-            (10.0, 35.0), (10.0, 45.0), (15.0, 50.0), (20.0, 45.0)
-        ]);
+        assert_eq!(v, vec![(20.0, 2003.0), (20.0, 2013.0), (20.0, 2023.0), (15.0, 2028.0), (10.0, 2023.0), (10.0, 2013.0), (10.0, 2003.0), (15.0, 1998.0), (20.0, 2003.0)]);
 
         let v = contour_line_to_vec_of_tuple(contour_lines.0.get(8).unwrap());
 
-        assert_eq!(v, vec![
-            (20.0, 35.0), (15.0, 30.0), (10.0, 35.0), (15.0, 40.0), (20.0, 35.0)
-        ]);
+        assert_eq!(v, vec![(20.0, 2013.0), (15.0, 2018.0), (10.0, 2013.0), (15.0, 2008.0), (20.0, 2013.0)]);
     }
 
     #[test]
@@ -561,12 +545,11 @@ fn build_contours(dem: &DEMRaster, elevation_offset: f32, world_size: NonZeroUsi
             feature.map_coords_inplace(expand_by_cell_size);
         });
 
-        collections.insert(String::from("contours"), FeatureCollection(foo));
+        collections.insert(String::from("contours/1"), FeatureCollection(foo));
         ()
     });
 
-    // define *empty* 1,5,10,50,100 contour line layers, to be filled *later* after lod-specific selection!
-    collections.insert("contours/1".to_string(), FeatureCollection(vec![]));
+    // define *empty* 5,10,50,100 contour line layers, to be filled *later* after lod-specific selection!
     collections.insert("contours/5".to_string(), FeatureCollection(vec![]));
     collections.insert("contours/10".to_string(), FeatureCollection(vec![]));
     collections.insert("contours/50".to_string(), FeatureCollection(vec![]));
