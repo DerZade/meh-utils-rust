@@ -74,13 +74,13 @@ mod tests {
         assert!(res.is_ok());
 
         vec![
-            "contours/5", "contours/10", "contours/50", "contours/100"
+            "contours/05", "contours/10", "contours/50", "contours/100"
         ].into_iter().for_each(|k| {
             let layer = collections.get(k);
             assert!(layer.is_some(), "no layer {}!", k);
             assert_eq!(0, layer.unwrap().0.len());
         });
-        let layer1 = collections.get("contours/1");
+        let layer1 = collections.get("contours/01");
         assert!(layer1.is_some());
         assert_eq!(layer1.unwrap().0.len(), 8);
     }
@@ -112,10 +112,10 @@ mod tests {
         let res = build_contours(&raster, 50.0, NonZeroUsize::new(2048).unwrap(), &mut collections);
 
         assert!(res.is_ok());
-        assert!(collections.contains_key("contours/1"));
-        let contour_lines: &FeatureCollection = collections.get("contours/1").unwrap();
+        assert!(collections.contains_key("contours/01"));
+        let contour_lines: &FeatureCollection = collections.get("contours/01").unwrap();
         assert_eq!(contour_lines.len(), 10);
-        println!("ookay collection: {}", collections.get("contours/1").unwrap().0.len());
+        println!("ookay collection: {}", collections.get("contours/01").unwrap().0.len());
 
         let v = contour_line_to_vec_of_tuple(contour_lines.0.get(0).unwrap());
 
@@ -252,14 +252,14 @@ mod tests {
 
     #[test]
     fn fill_contour_layers_copies_only_every_fifth_feature_from_contours_to_contours_5() {
-        let mut layers = collections_with_layers(vec!["contours", "contours/5", "foo"]);
+        let mut layers = collections_with_layers(vec!["contours", "contours/05", "foo"]);
         for _ in 0..11 {
             layers.get_mut("contours").unwrap().push(some_feature());
         }
 
         fill_contour_layers(layers.keys().map(|f| {f.to_string()}).collect(), &mut layers);
 
-        let contours_5_features = &layers.get("contours/5").unwrap().0;
+        let contours_5_features = &layers.get("contours/05").unwrap().0;
         let contours_features = &layers.get("contours").unwrap().0;
         assert_eq!(3, contours_5_features.len());
         assert_eq!(contours_features.get(0).unwrap().geometry, contours_5_features.get(0).unwrap().geometry);
@@ -545,12 +545,12 @@ fn build_contours(dem: &DEMRaster, elevation_offset: f32, world_size: NonZeroUsi
             feature.map_coords_inplace(expand_by_cell_size);
         });
 
-        collections.insert(String::from("contours/1"), FeatureCollection(foo));
+        collections.insert(String::from("contours/01"), FeatureCollection(foo));
         ()
     });
 
     // define *empty* 5,10,50,100 contour line layers, to be filled *later* after lod-specific selection!
-    collections.insert("contours/5".to_string(), FeatureCollection(vec![]));
+    collections.insert("contours/05".to_string(), FeatureCollection(vec![]));
     collections.insert("contours/10".to_string(), FeatureCollection(vec![]));
     collections.insert("contours/50".to_string(), FeatureCollection(vec![]));
     collections.insert("contours/100".to_string(), FeatureCollection(vec![]));
