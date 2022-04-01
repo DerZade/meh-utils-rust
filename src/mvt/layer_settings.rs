@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+use serde::Deserialize;
+use serde_json::from_str;
 use crate::mvt::FeatureCollection;
 
 #[cfg(test)]
@@ -39,6 +41,25 @@ mod tests {
         let lod_layers: Vec<String> = find_lod_layers(&collections, 1);
         assert_eq!(0, lod_layers.len());
     }
+
+    #[test]
+    fn find_lod_layers_uses_default_layer_settings() {
+        let collections = collections_with_layers(vec!["contours/50", "contours/100"]);
+        let lod_layers: Vec<String> = find_lod_layers(&collections, 2);
+        assert_eq!(vec!["contours/100".to_string()], lod_layers);
+
+        let collections = collections_with_layers(vec!["contours/50", "contours/100"]);
+        let lod_layers: Vec<String> = find_lod_layers(&collections, 3);
+        assert_eq!(vec!["contours/50".to_string(), "contours/100".to_string()], lod_layers);
+
+    }
+}
+
+#[derive(Deserialize)]
+struct LayerSetting {
+    pub minzoom: Option<usize>,
+    pub maxzoom: Option<usize>,
+    pub layer: String,
 }
 
 ///
@@ -56,8 +77,12 @@ mod tests {
 ///
 /// return layer names
 ///
-pub fn find_lod_layers(all_layers: &HashMap<String, FeatureCollection>, _lod: usize) -> Vec<String> {
-    println!("WARNING: find_lod_layers is currently a well-meaning stub that just returns everything!");
+pub fn find_lod_layers(all_layers: &HashMap<String, FeatureCollection>, lod: usize) -> Vec<String> {
+    let x: Vec<LayerSetting> = from_str("[{\"layer\":\"contours/100\"}, {\"layer\":\"contours/50\", \"minzoom\":3}]").unwrap();
+    all_layers.keys().map(|s| {s.clone()}).filter(|k| {
 
-    all_layers.keys().map(|s| {s.clone()}).filter(|k| {k.ne("contours")}).collect::<Vec<String>>()
+        x.iter().find(|s| {
+            s.layer == *k && s.minzoom.unwrap_or(0) <= lod && s.maxzoom.unwrap_or(255) >= lod
+        }).is_some()
+    }).collect::<Vec<String>>()
 }
