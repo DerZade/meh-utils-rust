@@ -152,12 +152,12 @@ fn layer_fields(layer_name: &String) -> HashMap<String, String> {
     if layer_name.starts_with("contours/") {
         return [
             (
-                String::from("elevation"),
-                String::from("Corrected elevation of contour. (Includes elevationOffset)"),
-            ),
-            (
                 String::from("dem_elevation"),
                 String::from("DEM elevation of contour."),
+            ),
+            (
+                String::from("elevation"),
+                String::from("Corrected elevation of contour. (Includes elevationOffset)"),
             ),
         ]
         .into_iter()
@@ -166,6 +166,10 @@ fn layer_fields(layer_name: &String) -> HashMap<String, String> {
 
     if layer_name.starts_with("locations/") {
         return [
+            (
+                String::from("angle"),
+                String::from("Corresponds to angle value in map config."),
+            ),
             (
                 String::from("name"),
                 String::from("Corresponds to name value in map config."),
@@ -177,10 +181,6 @@ fn layer_fields(layer_name: &String) -> HashMap<String, String> {
             (
                 String::from("radiusB"),
                 String::from("Corresponds to radiusB value in map config."),
-            ),
-            (
-                String::from("angle"),
-                String::from("Corresponds to angle value in map config."),
             ),
         ]
         .into_iter()
