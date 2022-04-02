@@ -29,13 +29,6 @@ mod tests {
     }
 
     #[test]
-    fn find_lod_layers_stub_returns_everything() {
-        let collections = collections_with_layers(vec!["foo"]);
-        let lod_layers = find_lod_layers(&collections, 1);
-        assert_eq!(vec!["foo".to_string()], lod_layers);
-    }
-
-    #[test]
     fn find_lod_layers_stub_removes_contours_layer() {
         let collections = collections_with_layers(vec!["contours"]);
         let lod_layers: Vec<String> = find_lod_layers(&collections, 1);
