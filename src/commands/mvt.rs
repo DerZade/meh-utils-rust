@@ -7,7 +7,7 @@ use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 
 use crate::dem::{DEMRaster, load_dem};
 use crate::feature::{FeatureCollection, Simplifiable};
-use crate::mvt::{load_geo_jsons, build_mounts, find_lod_layers, MvtGeoFloatType, ArmaMaxLodTileProjection, Collections, LodProjection};
+use crate::mvt::{load_geo_jsons, build_mounts, find_lod_layers, MvtGeoFloatType, ArmaMaxLodTileProjection, Collections, LodProjection, LayerSettingsFile};
 
 use std::collections::HashMap;
 use std::num::NonZeroUsize;
@@ -615,7 +615,8 @@ fn build_vector_tiles(output_path: &Path, collections: Collections, max_lod: usi
         });
 
 
-        let lod_layer_names = find_lod_layers(projection.get_collections_mut(), lod);
+        let layer_settings_path = Path::new("./resources/default_layer_settings.json").to_path_buf();
+        let lod_layer_names = find_lod_layers(projection.get_collections_mut(), lod, &LayerSettingsFile::from_path(layer_settings_path))?;
         // note: the following is called fillContourLayers in https://github.com/DerZade/meh-utils/blob/master/internal/mvt/buildVectorTiles.go#L239-L278
         fill_contour_layers(lod_layer_names, projection.get_collections_mut()).unwrap_or_else(|e| {
             println!("could not generate contours for lod {}: {}", lod, e);

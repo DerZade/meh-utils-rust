@@ -1,6 +1,8 @@
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::{BufReader};
+use std::path::{PathBuf};
 use serde::Deserialize;
-use serde_json::from_str;
 use crate::mvt::FeatureCollection;
 
 #[cfg(test)]
@@ -8,7 +10,8 @@ mod tests {
     use std::collections::HashMap;
     use geo::Coordinate;
     use crate::feature::{Feature, FeatureCollection};
-    use crate::mvt::layer_settings::find_lod_layers;
+    use crate::mvt::layer_settings::{DummyLayerSettings, find_lod_layers};
+    use rstest::rstest;
 
     fn some_feature() -> Feature {
         Feature {
@@ -28,31 +31,78 @@ mod tests {
         collections
     }
 
-    #[test]
-    fn find_lod_layers_stub_removes_contours_layer() {
-        let collections = collections_with_layers(vec!["contours"]);
-        let lod_layers: Vec<String> = find_lod_layers(&collections, 1);
-        assert_eq!(0, lod_layers.len());
-    }
+    #[rstest]
+    #[case(1, vec!["always", "lte_lod1"])]
+    #[case(2, vec!["always"])]
+    #[case(3, vec!["always", "gte_lod3", "lod3"])]
+    #[case(4, vec!["always", "gte_lod3"])]
+    fn find_lod_layers_uses_default_layer_settings(#[case] lod: usize, #[case] visible_layers: Vec<&str>) {
+        let layers = vec!["lte_lod1", "always", "gte_lod3", "lod3", "never"];
+        let mut visible_layers_string: Vec<String> = visible_layers.clone().into_iter().map(|s| {s.to_string()}).collect();
+        let collections = collections_with_layers(layers);
 
-    #[test]
-    fn find_lod_layers_uses_default_layer_settings() {
-        let collections = collections_with_layers(vec!["contours/50", "contours/100"]);
-        let lod_layers: Vec<String> = find_lod_layers(&collections, 2);
-        assert_eq!(vec!["contours/100".to_string()], lod_layers);
+        let mut lod_layers: Vec<String> = find_lod_layers(&collections, lod, &DummyLayerSettings::new()).unwrap();
 
-        let collections = collections_with_layers(vec!["contours/50", "contours/100"]);
-        let lod_layers: Vec<String> = find_lod_layers(&collections, 3);
-        assert_eq!(vec!["contours/50".to_string(), "contours/100".to_string()], lod_layers);
+        visible_layers_string.sort();
+        lod_layers.sort();
 
+        assert_eq!(visible_layers_string, lod_layers);
     }
 }
 
-#[derive(Deserialize)]
-struct LayerSetting {
+#[derive(Deserialize, Clone)]
+pub struct LayerSetting {
     pub minzoom: Option<usize>,
     pub maxzoom: Option<usize>,
     pub layer: String,
+}
+
+pub trait LayerSettingSource {
+    fn get_layer_settings(&self) -> anyhow::Result<Vec<LayerSetting>>;
+}
+
+pub struct LayerSettingsFile {
+    path: PathBuf
+}
+
+struct DummyLayerSettings {
+    pub settings: Vec<LayerSetting>
+}
+impl DummyLayerSettings {
+    pub fn new() -> DummyLayerSettings {
+        DummyLayerSettings {
+            settings: vec![
+                LayerSetting { layer: "always".to_string(), minzoom: None, maxzoom: None},
+                LayerSetting { layer: "lte_lod1".to_string(), minzoom: None, maxzoom: Some(1)},
+                LayerSetting { layer: "lod3".to_string(), minzoom: Some(3), maxzoom: Some(3)},
+                LayerSetting { layer: "gte_lod3".to_string(), minzoom: Some(3), maxzoom: None},
+            ]
+        }
+    }
+}
+impl LayerSettingSource for DummyLayerSettings {
+    fn get_layer_settings(&self) -> anyhow::Result<Vec<LayerSetting>> {
+        Ok(self.settings.clone())
+    }
+}
+
+impl LayerSettingsFile {
+    pub fn from_path(path: PathBuf) -> LayerSettingsFile {
+        LayerSettingsFile {
+            path
+        }
+    }
+}
+
+impl LayerSettingSource for LayerSettingsFile {
+    fn get_layer_settings(&self) -> anyhow::Result<Vec<LayerSetting>> {
+        let file = File::open(&self.path)?;
+        let reader = BufReader::new(file);
+
+        serde_json::from_reader(reader).map_err(|e| {
+            anyhow::Error::new(Box::new(e))
+        })
+    }
 }
 
 ///
@@ -70,12 +120,12 @@ struct LayerSetting {
 ///
 /// return layer names
 ///
-pub fn find_lod_layers(all_layers: &HashMap<String, FeatureCollection>, lod: usize) -> Vec<String> {
-    let x: Vec<LayerSetting> = from_str("[{\"layer\":\"contours/100\"}, {\"layer\":\"contours/50\", \"minzoom\":3}]").unwrap();
-    all_layers.keys().map(|s| {s.clone()}).filter(|k| {
+pub fn find_lod_layers(all_layers: &HashMap<String, FeatureCollection>, lod: usize, layer_setting_source: &dyn LayerSettingSource) -> anyhow::Result<Vec<String>> {
+    let x: Vec<LayerSetting> = layer_setting_source.get_layer_settings()?;
+    Ok(all_layers.keys().map(|s| {s.clone()}).filter(|k| {
 
         x.iter().find(|s| {
             s.layer == *k && s.minzoom.unwrap_or(0) <= lod && s.maxzoom.unwrap_or(255) >= lod
         }).is_some()
-    }).collect::<Vec<String>>()
+    }).collect::<Vec<String>>())
 }
