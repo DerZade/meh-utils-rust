@@ -10,6 +10,7 @@ use std::{
 
 pub use parser::DEMParser;
 pub use raster::DEMRaster;
+pub use raster::Origin;
 
 pub fn load_dem(path: &Path) -> anyhow::Result<DEMRaster> {
     let file = File::open(path)?;

@@ -4,14 +4,19 @@ pub enum Origin {
     Corner(f32, f32),
 }
 
+
+/// DEM is short for Digital Elevation Model.
 #[derive(Debug)]
 pub struct DEMRaster {
     columns: usize,
     rows: usize,
     left: f32,
     bottom: f32,
+    /// the DEM resolution: DEM contains one measurement for each cell of area cell_size*cell_size meters²
     cell_size: f32,
+    /// the magic value used for "unknown value in this cell"
     no_data_value: f32,
+    /// ordered list of elevation raster values, to be folded into `columns` and `rows`
     data: Vec<f32>,
 }
 
@@ -43,6 +48,10 @@ impl DEMRaster {
         }
     }
 
+    pub fn get_cell_size(&self) -> f32 {
+        self.cell_size
+    }
+
     pub fn dimensions(&self) -> (usize, usize) {
         (self.columns, self.rows)
     }
@@ -62,5 +71,9 @@ impl DEMRaster {
 
     pub fn get_data(&self) -> &Vec<f32> {
         &self.data
+    }
+
+    pub fn get_no_data_value(&self) -> f32 {
+        self.no_data_value
     }
 }

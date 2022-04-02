@@ -1,5 +1,5 @@
+use std::ops::Add;
 use anyhow::bail;
-use clap::{arg, App};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 use std::path::Path;
@@ -7,30 +7,12 @@ use std::time::Instant;
 
 use image::{imageops::replace, io::Reader as ImageReader, DynamicImage, GenericImageView};
 
-use crate::commands::Command;
 use crate::utils::{build_tile_set, calc_max_lod, TileError};
 
 pub struct Sat {}
-
-impl Command for Sat {
-    fn register(&self) -> App<'static> {
-        App::new("sat")
-            .about("Build satellite tiles from grad_meh data.")
-            .arg(arg!(-i --input <INPUT_DIR> "Path to grad_meh map directory"))
-            .arg(arg!(-o --output <OUTPUT_DIR> "Path to output directory"))
-    }
-    fn run(&self, args: &clap::ArgMatches) -> anyhow::Result<()> {
+impl Sat {
+    pub fn exec(&self, input_path: &Path, output_path: &Path) -> anyhow::Result<()> {
         let start = Instant::now();
-
-        let input_path_str = args.value_of("input").unwrap();
-        let output_path_str = args.value_of("output").unwrap();
-
-        let input_path = Path::new(input_path_str);
-        let output_path = Path::new(output_path_str);
-
-        if !output_path.is_dir() {
-            bail!("Output path is not a directory");
-        }
 
         println!("▶️  Loading meta.json");
         let meta_path = input_path.join("meta.json");
@@ -66,7 +48,7 @@ impl Command for Sat {
 
         let now = Instant::now();
         println!("▶️  Creating tile.json");
-        crate::tilejson::write(output_path, max_lod, meta, "Satellite", Vec::new())?;
+        crate::tilejson::write(output_path, max_lod, meta, "Satellite", &Vec::new(), "https://localhost/".to_string().add("{z}/{x}/{y}.png"))?;
         println!("✔️  Created tile.json in {}ms", now.elapsed().as_millis());
 
         println!("\n    🎉  Finished in {}ms", start.elapsed().as_millis());

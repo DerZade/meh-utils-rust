@@ -1,12 +1,57 @@
 use serde::Serialize;
 
 use std::{collections::HashMap, fs::File, path::Path};
-
 use serde_json::to_string_pretty;
-
 use std::io::{Error, Write};
-
 use crate::metajson::MetaJSON;
+
+#[cfg(test)]
+mod tests {
+    use std::fs::{read_to_string};
+    use std::num::NonZeroUsize;
+    use std::ops::Add;
+    use crate::metajson::MetaJSON;
+    use crate::test::with_input_and_output_paths;
+    use crate::tilejson::write;
+
+    #[test]
+    #[allow(unused_must_use)]
+    fn tile_json_gets_written_correctly() {
+        with_input_and_output_paths(|_, output_path| {
+            let res = write(
+                &output_path,
+                5,
+                MetaJSON {
+                    author: "author".to_string(),
+                    display_name: "display_name".to_string(),
+                    elevation_offset: 0.0,
+                    grid_offset_x: 1.0,
+                    grid_offset_y: 2.0,
+                    grids: vec![],
+                    latitude: 3.0,
+                    longitude: 4.0,
+                    color_outside: None,
+                    version: "5.0".to_string(),
+                    world_name: "world_name".to_string(),
+                    world_size: NonZeroUsize::new(6).unwrap(),
+                },
+                "type_display_name",
+                &Vec::new(),
+                "https://localhost:3000/".to_string().add("{z}/{x}/{y}.png")
+            );
+
+            assert!(res.is_ok());
+
+            let written = read_to_string(output_path.join("tile.json"));
+            assert![written.is_ok()];
+            let str = written.unwrap();
+
+            assert!(str.contains("\"minzoom\""));
+            assert!(str.contains("\"maxzoom\""));
+            assert!(str.contains("\"vector_layers\""));
+        });
+    }
+}
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -17,26 +62,27 @@ pub struct TileJSONLayer {
 }
 
 #[derive(Debug, Serialize)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename = "snake_case")]
 #[allow(dead_code)]
+/// https://github.com/mapbox/tilejson-spec
 pub struct TileJSON {
-    pub tile_json: String,
+    pub tilejson: String,
     pub name: String,
     pub description: String,
     pub scheme: String,
-    pub min_zoom: u8,
-    pub max_zoom: u8,
-
-    #[serde(rename = "snake_case")]
+    pub minzoom: usize,
+    pub maxzoom: usize,
     pub vector_layers: Option<Vec<TileJSONLayer>>,
+    pub tiles: Vec<String>
 }
 
 pub fn write(
     dir: &Path,
-    max_lod: u8,
+    max_lod: usize,
     meta: MetaJSON,
     type_display_name: &str,
-    vector_layer_names: Vec<String>,
+    vector_layer_names: &Vec<String>,
+    tile_uri: String,
 ) -> Result<(), Error> {
     let vector_layers: Vec<_> = vector_layer_names
         .iter()
@@ -49,16 +95,17 @@ pub fn write(
         .collect();
 
     let tile_json = TileJSON {
-        tile_json: String::from("2.2.0"),
+        tilejson: String::from("2.2.0"),
         name: format!("{} {} Tiles", meta.display_name, type_display_name),
         description: format!(
             "{} Tiles of the Arma 3 Map '{}' from {}",
             type_display_name, meta.display_name, meta.author
         ),
         scheme: String::from("xyz"),
-        min_zoom: 0,
-        max_zoom: max_lod,
+        minzoom: 0,
+        maxzoom: max_lod.into(),
         vector_layers: Some(vector_layers),
+        tiles: vec![tile_uri]
     };
 
     let mut file = File::create(dir.join("tile.json"))?;
@@ -105,12 +152,12 @@ fn layer_fields(layer_name: &String) -> HashMap<String, String> {
     if layer_name.starts_with("contours/") {
         return [
             (
-                String::from("elevation"),
-                String::from("Corrected elevation of contour. (Includes elevationOffset)"),
-            ),
-            (
                 String::from("dem_elevation"),
                 String::from("DEM elevation of contour."),
+            ),
+            (
+                String::from("elevation"),
+                String::from("Corrected elevation of contour. (Includes elevationOffset)"),
             ),
         ]
         .into_iter()
@@ -119,6 +166,10 @@ fn layer_fields(layer_name: &String) -> HashMap<String, String> {
 
     if layer_name.starts_with("locations/") {
         return [
+            (
+                String::from("angle"),
+                String::from("Corresponds to angle value in map config."),
+            ),
             (
                 String::from("name"),
                 String::from("Corresponds to name value in map config."),
@@ -130,10 +181,6 @@ fn layer_fields(layer_name: &String) -> HashMap<String, String> {
             (
                 String::from("radiusB"),
                 String::from("Corresponds to radiusB value in map config."),
-            ),
-            (
-                String::from("angle"),
-                String::from("Corresponds to angle value in map config."),
             ),
         ]
         .into_iter()

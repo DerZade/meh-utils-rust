@@ -5,7 +5,7 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 use super::{encode_png, TileError, TILE_SIZE_IN_PX};
 
-pub fn build_tile_set(set_base_path: &Path, img: &DynamicImage, lod: u8) -> anyhow::Result<()> {
+pub fn build_tile_set(set_base_path: &Path, img: &DynamicImage, lod: usize) -> anyhow::Result<()> {
     let tiles_per_row_col = 2u32.pow(lod as u32);
 
     // generate all column directories
@@ -77,7 +77,7 @@ fn write_tile(
     img: &DynamicImage,
     x: u32,
     y: u32,
-    z: u8,
+    z: usize,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let file_path = set_base_path
         .join(z.to_string())

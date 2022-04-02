@@ -1,8 +1,6 @@
 use anyhow::bail;
-use clap::{arg, App};
 use image::{DynamicImage, Rgb, RgbImage};
 
-use crate::commands::Command;
 use crate::dem::{load_dem, DEMRaster};
 use crate::utils::{build_tile_set, calc_max_lod};
 
@@ -12,22 +10,9 @@ use std::time::Instant;
 
 pub struct TerrainRGB {}
 
-impl Command for TerrainRGB {
-    fn register(&self) -> App<'static> {
-        App::new("terrain_rgb")
-            .about("Build Terrain-RGB tiles from grad_meh data.")
-            .arg(arg!(-i --input <INPUT_DIR> "Path to grad_meh map directory"))
-            .arg(arg!(-o --output <OUTPUT_DIR> "Path to output directory"))
-    }
-    fn run(&self, args: &clap::ArgMatches) -> anyhow::Result<()> {
+impl TerrainRGB {
+    pub fn exec(&self, input_path: &Path, output_path: &Path) -> anyhow::Result<()> {
         let start = Instant::now();
-
-        let input_path_str = args.value_of("input").unwrap();
-        let output_path_str = args.value_of("output").unwrap();
-
-        let input_path = Path::new(input_path_str);
-        let output_path = Path::new(output_path_str);
-
         if !output_path.is_dir() {
             bail!("Output path is not a directory");
         }
