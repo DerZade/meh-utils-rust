@@ -233,15 +233,15 @@ mod tests {
 
     #[test]
     fn fill_contour_layers_copies_all_features_from_contours_to_contours_1() {
-        let contours_layer_name = "contours";
-        let mut layers = collections_with_layers(vec![contours_layer_name, "contours/1", "foo"]);
+        let contours_layer_name = "contours/01";
+        let mut layers = collections_with_layers(vec![contours_layer_name, "contours/01", "foo"]);
         layers.get_mut("foo").unwrap().push(some_feature());
         layers.get_mut(contours_layer_name).unwrap().push(some_feature());
         layers.get_mut(contours_layer_name).unwrap().push(some_feature());
 
         fill_contour_layers(layers.keys().map(|f| {f.to_string()}).collect(), &mut layers);
 
-        let contours_1_features = &layers.get("contours/1").unwrap().0;
+        let contours_1_features = &layers.get("contours/01").unwrap().0;
         let contours_features = &layers.get(contours_layer_name).unwrap().0;
         assert_eq!(2, contours_1_features.len());
         for i in 0..=1 {
@@ -252,15 +252,15 @@ mod tests {
 
     #[test]
     fn fill_contour_layers_copies_only_every_fifth_feature_from_contours_to_contours_5() {
-        let mut layers = collections_with_layers(vec!["contours", "contours/05", "foo"]);
+        let mut layers = collections_with_layers(vec!["contours/01", "contours/05", "foo"]);
         for _ in 0..11 {
-            layers.get_mut("contours").unwrap().push(some_feature());
+            layers.get_mut("contours/01").unwrap().push(some_feature());
         }
 
         fill_contour_layers(layers.keys().map(|f| {f.to_string()}).collect(), &mut layers);
 
         let contours_5_features = &layers.get("contours/05").unwrap().0;
-        let contours_features = &layers.get("contours").unwrap().0;
+        let contours_features = &layers.get("contours/01").unwrap().0;
         assert_eq!(3, contours_5_features.len());
         assert_eq!(contours_features.get(0).unwrap().geometry, contours_5_features.get(0).unwrap().geometry);
         assert_eq!(contours_features.get(5).unwrap().geometry, contours_5_features.get(1).unwrap().geometry);
@@ -618,16 +618,21 @@ fn build_vector_tiles(output_path: &Path, collections: Collections, max_lod: usi
 
 
         let layer_settings_path = Path::new("./resources/default_layer_settings.json").to_path_buf();
-        let lod_layer_names = find_lod_layers(projection.get_collections_mut(), lod, &LayerSettingsFile::from_path(layer_settings_path))?;
+        let mut lod_layer_names = find_lod_layers(projection.get_collections_mut(), lod, &LayerSettingsFile::from_path(layer_settings_path))?;
+        if is_max_lod { // TODO special rule that should live somewhere else
+            lod_layer_names = projection.get_collections().0.keys().map(|k| {k.clone()}).collect()
+        }
         let mut lod_layers: HashMap<String, FeatureCollection> = projection.get_collections().iter().filter(|c| {
             lod_layer_names.contains(c.0)
         }).map(|c| {
             (c.0.clone(), c.1.clone())
         }).collect();
+        println!("layers for lod {} are: {}", lod, lod_layer_names.join(", "));
         // note: the following is called fillContourLayers in https://github.com/DerZade/meh-utils/blob/master/internal/mvt/buildVectorTiles.go#L239-L278
         fill_contour_layers(lod_layer_names, projection.get_collections_mut()).unwrap_or_else(|e| {
             println!("could not generate contours for lod {}: {}", lod, e);
         });
+
         build_lod_vector_tiles(&mut lod_layers, world_size, lod, &lod_dir).unwrap_or_else(|err| {
             println!("error when generating vector tiles for lod {}: {}", lod, err);
         });
@@ -701,7 +706,7 @@ fn build_lod_vector_tiles(collections: &mut HashMap<String, FeatureCollection>, 
 /// This function fills the `^contours/\d+$` layers selectively with features from "contours" layer.
 fn fill_contour_layers(lod_layer_names: Vec<String>, collections: &mut HashMap<String, FeatureCollection>) -> anyhow::Result<()> {
 
-    let contour_layer = collections.get("contours");
+    let contour_layer = collections.get("contours/01");
 
     let contour_features: FeatureCollection = contour_layer
         .ok_or(anyhow::Error::msg("could not find 'contours' layer"))?
@@ -715,7 +720,7 @@ fn fill_contour_layers(lod_layer_names: Vec<String>, collections: &mut HashMap<S
             (name.to_string(), i)
         })
     }).filter(|(_, interval)| {
-        interval != &0
+        interval > &1
     }).collect();
 
     contours_names.iter().for_each(|(name, elevation)| {
