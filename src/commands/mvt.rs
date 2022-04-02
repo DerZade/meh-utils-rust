@@ -509,9 +509,7 @@ fn calc_max_lod(world_size: NonZeroUsize, tile_size: usize) -> anyhow::Result<us
     // lets say we want a resolution of 10cm, that is 10_000px/km. tiles are 4096px, so going from world_size that would be
     let tile_size_f64 = tile_size.to_f64().ok_or(anyhow::Error::msg(format!("could not convert {} to f64", tile_size)))?;
     let world_size_f64 = (world_size).get().to_f64().ok_or(anyhow::Error::msg(format!("could not convert {} to f64", world_size)))?;
-    (world_size_f64 * 10.0_f64 / tile_size_f64).max(1.0_f64).log2().ceil().to_usize().ok_or(anyhow::Error::msg("could not convert to usize. Negative value?"));
-
-    Ok(5)
+    (world_size_f64 * 10.0_f64 / tile_size_f64).max(1.0_f64).log2().ceil().to_usize().ok_or(anyhow::Error::msg("could not convert to usize. Negative value?"))
 }
 
 fn build_contours(dem: &DEMRaster, elevation_offset: f32, world_size: NonZeroUsize, collections: &mut Collections) -> anyhow::Result<()> {

@@ -16,8 +16,7 @@ pub fn calc_max_lod(image: &DynamicImage) -> usize {
 
     let tiles_per_row = (width / TILE_SIZE_IN_PX as f32).ceil();
 
-    return 5
-    // return tiles_per_row.log2().ceil() as usize;
+    return tiles_per_row.log2().ceil() as usize;
 }
 
 pub fn encode_png(
