@@ -8,10 +8,12 @@ use crate::mvt::FeatureCollection;
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
+    use std::path::Path;
     use geo::Coordinate;
     use crate::feature::{Feature, FeatureCollection};
-    use crate::mvt::layer_settings::{DummyLayerSettings, find_lod_layers};
+    use crate::mvt::layer_settings::{DummyLayerSettings, find_lod_layers, LayerSetting, LayerSettingSource};
     use rstest::rstest;
+    use crate::mvt::LayerSettingsFile;
 
     fn some_feature() -> Feature {
         Feature {
@@ -48,9 +50,34 @@ mod tests {
 
         assert_eq!(visible_layers_string, lod_layers);
     }
+
+    #[test]
+    fn layer_settings_file_reads_file() {
+        let layer_settings_res = LayerSettingsFile::from_path(Path::new("./resources/default_layer_settings.json").to_path_buf()).get_layer_settings();
+
+        assert!(layer_settings_res.is_ok());
+
+        let layer_settings = layer_settings_res.unwrap();
+
+        assert_eq!(layer_settings.len(), 56);
+        let first = layer_settings.first().unwrap();
+        assert_eq!(*first, LayerSetting {layer: "debug".to_string(), minzoom: Some(6), maxzoom: None});
+        let last = layer_settings.last().unwrap();
+        assert_eq!(*last, LayerSetting {layer: "contours/100".to_string(), minzoom: Some(0), maxzoom: Some(2)})
+    }
+
+    #[test]
+    fn layer_settings_file_errors_if_file_not_found() {
+        assert!(LayerSettingsFile::from_path(Path::new("./resources/i_dont_exist.json").to_path_buf()).get_layer_settings().is_err());
+    }
+
+    #[test]
+    fn layer_settings_file_errors_if_file_not_json() {
+        assert!(LayerSettingsFile::from_path(Path::new("./resources/test/happy/output/.keep").to_path_buf()).get_layer_settings().is_err());
+    }
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Clone, Debug, PartialEq)]
 pub struct LayerSetting {
     pub minzoom: Option<usize>,
     pub maxzoom: Option<usize>,
