@@ -11,9 +11,31 @@ mod tests {
     use std::path::Path;
     use geo::Coordinate;
     use crate::feature::{Feature, FeatureCollection};
-    use crate::mvt::layer_settings::{DummyLayerSettings, find_lod_layers, LayerSetting, LayerSettingSource};
+    use crate::mvt::layer_settings::{find_lod_layers, LayerSetting, LayerSettingSource};
     use rstest::rstest;
     use crate::mvt::LayerSettingsFile;
+
+
+    struct DummyLayerSettings {
+        pub settings: Vec<LayerSetting>
+    }
+    impl DummyLayerSettings {
+        pub fn new() -> DummyLayerSettings {
+            DummyLayerSettings {
+                settings: vec![
+                    LayerSetting { layer: "always".to_string(), minzoom: None, maxzoom: None},
+                    LayerSetting { layer: "lte_lod1".to_string(), minzoom: None, maxzoom: Some(1)},
+                    LayerSetting { layer: "lod3".to_string(), minzoom: Some(3), maxzoom: Some(3)},
+                    LayerSetting { layer: "gte_lod3".to_string(), minzoom: Some(3), maxzoom: None},
+                ]
+            }
+        }
+    }
+    impl LayerSettingSource for DummyLayerSettings {
+        fn get_layer_settings(&self) -> anyhow::Result<Vec<LayerSetting>> {
+            Ok(self.settings.clone())
+        }
+    }
 
     fn some_feature() -> Feature {
         Feature {
@@ -90,27 +112,6 @@ pub trait LayerSettingSource {
 
 pub struct LayerSettingsFile {
     path: PathBuf
-}
-
-struct DummyLayerSettings {
-    pub settings: Vec<LayerSetting>
-}
-impl DummyLayerSettings {
-    pub fn new() -> DummyLayerSettings {
-        DummyLayerSettings {
-            settings: vec![
-                LayerSetting { layer: "always".to_string(), minzoom: None, maxzoom: None},
-                LayerSetting { layer: "lte_lod1".to_string(), minzoom: None, maxzoom: Some(1)},
-                LayerSetting { layer: "lod3".to_string(), minzoom: Some(3), maxzoom: Some(3)},
-                LayerSetting { layer: "gte_lod3".to_string(), minzoom: Some(3), maxzoom: None},
-            ]
-        }
-    }
-}
-impl LayerSettingSource for DummyLayerSettings {
-    fn get_layer_settings(&self) -> anyhow::Result<Vec<LayerSetting>> {
-        Ok(self.settings.clone())
-    }
 }
 
 impl LayerSettingsFile {

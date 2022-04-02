@@ -617,11 +617,16 @@ fn build_vector_tiles(output_path: &Path, collections: Collections, max_lod: usi
 
         let layer_settings_path = Path::new("./resources/default_layer_settings.json").to_path_buf();
         let lod_layer_names = find_lod_layers(projection.get_collections_mut(), lod, &LayerSettingsFile::from_path(layer_settings_path))?;
+        let mut lod_layers: HashMap<String, FeatureCollection> = projection.get_collections().iter().filter(|c| {
+            lod_layer_names.contains(c.0)
+        }).map(|c| {
+            (c.0.clone(), c.1.clone())
+        }).collect();
         // note: the following is called fillContourLayers in https://github.com/DerZade/meh-utils/blob/master/internal/mvt/buildVectorTiles.go#L239-L278
         fill_contour_layers(lod_layer_names, projection.get_collections_mut()).unwrap_or_else(|e| {
             println!("could not generate contours for lod {}: {}", lod, e);
         });
-        build_lod_vector_tiles(projection.get_collections_mut(), world_size, lod, &lod_dir).unwrap_or_else(|err| {
+        build_lod_vector_tiles(&mut lod_layers, world_size, lod, &lod_dir).unwrap_or_else(|err| {
             println!("error when generating vector tiles for lod {}: {}", lod, err);
         });
 
