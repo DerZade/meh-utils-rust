@@ -1,39 +1,40 @@
-use std::num::NonZeroUsize;
+use crate::mvt::{Collections, MvtGeoFloatType};
 use geo::map_coords::MapCoordsInplace;
 use num_traits::ToPrimitive;
-use crate::mvt::{Collections, MvtGeoFloatType};
+use std::num::NonZeroUsize;
 
 #[cfg(test)]
 mod tests {
+    use crate::feature::{Feature, FeatureCollection};
+    use crate::mvt::project_arma_to_tile::LodProjection;
+    use crate::mvt::{ArmaMaxLodTileProjection, Collections, MvtGeoFloatType};
     use std::collections::HashMap;
     use std::num::NonZeroUsize;
-    use crate::feature::{Feature, FeatureCollection};
-    use crate::mvt::{ArmaMaxLodTileProjection, Collections, MvtGeoFloatType};
-    use crate::mvt::project_arma_to_tile::LodProjection;
 
-    fn assert_point_geometry(proj: &dyn LodProjection, x: &MvtGeoFloatType, y: &MvtGeoFloatType) -> () {
+    fn assert_point_geometry(proj: &dyn LodProjection, x: &MvtGeoFloatType, y: &MvtGeoFloatType) {
         let features = proj.get_collections().0.get("foo").unwrap();
         let feature: &Feature = features.0.get(0).unwrap();
         match &feature.geometry {
             geo::Geometry::Point(geo::Point(c)) => {
-                assert_eq!(c, &geo::Coordinate {x: x.clone(), y: y.clone()});
-            },
-            _ => assert!(false)
+                assert_eq!(c, &geo::Coordinate { x: *x, y: *y });
+            }
+            _ => unreachable!(),
         }
     }
 
     #[test]
     fn max_projection_does_project_to_max() {
         let mut collections = Collections::new();
-        let features = vec![
-            Feature {
-                geometry: geo::Geometry::Point(geo::Point(geo::Coordinate {x: 1.0, y: 2.0})),
-                properties: HashMap::new(),
-            }
-        ];
-        collections.0.insert("foo".to_string(), FeatureCollection(features));
+        let features = vec![Feature {
+            geometry: geo::Geometry::Point(geo::Point(geo::Coordinate { x: 1.0, y: 2.0 })),
+            properties: HashMap::new(),
+        }];
+        collections
+            .0
+            .insert("foo".to_string(), FeatureCollection(features));
 
-        let proj = ArmaMaxLodTileProjection::new(collections, NonZeroUsize::new(1024).unwrap(), 3, 2048);
+        let proj =
+            ArmaMaxLodTileProjection::new(collections, NonZeroUsize::new(1024).unwrap(), 3, 2048);
 
         assert_point_geometry(&proj, &16.0, &16352.0);
 
@@ -43,17 +44,17 @@ mod tests {
 
     #[test]
     fn projection_does_decrease_lods_correctly() {
-
         let mut collections = Collections::new();
-        let features = vec![
-            Feature {
-                geometry: geo::Geometry::Point(geo::Point(geo::Coordinate {x: 1.0, y: 2.0})),
-                properties: HashMap::new(),
-            }
-        ];
-        collections.0.insert("foo".to_string(), FeatureCollection(features));
+        let features = vec![Feature {
+            geometry: geo::Geometry::Point(geo::Point(geo::Coordinate { x: 1.0, y: 2.0 })),
+            properties: HashMap::new(),
+        }];
+        collections
+            .0
+            .insert("foo".to_string(), FeatureCollection(features));
 
-        let mut proj = ArmaMaxLodTileProjection::new(collections, NonZeroUsize::new(1024).unwrap(), 3, 2048);
+        let mut proj =
+            ArmaMaxLodTileProjection::new(collections, NonZeroUsize::new(1024).unwrap(), 3, 2048);
 
         assert_eq!(proj.get_lod(), 3);
 
@@ -83,18 +84,24 @@ pub struct ArmaMaxLodTileProjection {
     current_lod: usize,
 }
 impl ArmaMaxLodTileProjection {
-    pub fn new(mut collections: Collections, world_size: NonZeroUsize, max_lod: usize, tile_size: u64, ) -> Self {
+    pub fn new(
+        mut collections: Collections,
+        world_size: NonZeroUsize,
+        max_lod: usize,
+        tile_size: u64,
+    ) -> Self {
         let world_size_f32 = world_size.get() as f32;
         let tiles_per_dimension = 2_u32.pow(max_lod.to_u32().unwrap());
         let pixels = tiles_per_dimension as u64 * tile_size;
         let factor = pixels as f32 / world_size_f32;
         collections.map_coords_inplace(|(x, y): &(MvtGeoFloatType, MvtGeoFloatType)| {
-            (
-                *x * factor,
-                (world_size_f32 - *y) * factor,
-            )
+            (*x * factor, (world_size_f32 - *y) * factor)
         });
-        ArmaMaxLodTileProjection {collections, max_lod, current_lod: max_lod.into()}
+        ArmaMaxLodTileProjection {
+            collections,
+            max_lod,
+            current_lod: max_lod,
+        }
     }
 }
 
@@ -107,21 +114,19 @@ pub trait LodProjection {
 }
 
 impl LodProjection for ArmaMaxLodTileProjection {
-
     fn get_lod(&self) -> usize {
         self.current_lod
     }
 
     fn decrease_lod(&mut self) -> anyhow::Result<usize> {
-        self.collections.map_coords_inplace(|&(x, y)| {
-            (
-                x / 2.0,
-                y / 2.0
-            )
-        });
+        self.collections
+            .map_coords_inplace(|&(x, y)| (x / 2.0, y / 2.0));
         self.current_lod
             .checked_sub(1)
-            .map(|u| {self.current_lod = u; self.current_lod})
+            .map(|u| {
+                self.current_lod = u;
+                self.current_lod
+            })
             .ok_or(anyhow::Error::msg("lod zero reached"))
     }
 

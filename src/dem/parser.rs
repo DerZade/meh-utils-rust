@@ -54,9 +54,9 @@ impl<I> ParseError<I> for DEMParserError {
     }
 }
 
-impl Into<nom::Err<DEMParserError>> for DEMParserError {
-    fn into(self) -> nom::Err<DEMParserError> {
-        nom::Err::Failure(self)
+impl From<DEMParserError> for nom::Err<DEMParserError> {
+    fn from(val: DEMParserError) -> Self {
+        nom::Err::Failure(val)
     }
 }
 
@@ -257,6 +257,7 @@ impl DEMParser {
             return Err(DEMParserError::MissingOrigin.into());
         }
 
+        #[allow(clippy::unnecessary_unwrap)]
         let origin = if x_center.is_some() && y_center.is_some() {
             Origin::Center(x_center.unwrap(), y_center.unwrap())
         } else {
@@ -284,15 +285,15 @@ impl DEMParser {
         let mut data: Vec<f32> = Vec::with_capacity(columns * rows);
 
         for row_index in 0..rows {
-            if input.len() == 0 {
-                return Err(DEMParserError::MissingRow.into());
+            if input.is_empty() {
+                return Err(DEMParserError::MissingRow);
             }
 
             let (remaining_input, ref mut vec) = DEMParser::data_line(input)?;
             input = remaining_input;
 
             if vec.len() < columns {
-                return Err(DEMParserError::RowTooShort(row_index).into());
+                return Err(DEMParserError::RowTooShort(row_index));
             }
 
             if vec.len() > columns {
@@ -319,7 +320,8 @@ mod tests {
 
     #[test]
     fn parser_parses() {
-        let res = DEMParser::parse("ncols 3
+        let res = DEMParser::parse(
+            "ncols 3
 nrows 4
 xllcorner 0
 yllcorner -4
@@ -329,7 +331,8 @@ NODATA_value -9999
 2.0 3.0 4.0
 3.0 4.0 5.0
 4.0 5.0 6.0
-");
+",
+        );
         assert!(res.is_ok());
         let dem_raster = res.unwrap();
         assert_eq!(dem_raster.z(0, 0), 1.0);

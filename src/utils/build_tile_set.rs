@@ -39,10 +39,10 @@ pub fn build_tile_set(set_base_path: &Path, img: &DynamicImage, lod: usize) -> a
 
                 // distribute remaining pixels over the first X rows / cols
                 if width_remainder > col + 1 {
-                    w = w + 1;
+                    w += 1;
                 }
                 if height_remainder > row + 1 {
-                    h = h + 1;
+                    h += 1;
                 }
 
                 let sub = img.view(x, y, w, h);
@@ -82,6 +82,6 @@ fn write_tile(
     let file_path = set_base_path
         .join(z.to_string())
         .join(x.to_string())
-        .join(format!("{}.png", y.to_string()));
+        .join(format!("{}.png", y));
     encode_png(&file_path, img)
 }

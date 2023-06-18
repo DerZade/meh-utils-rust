@@ -42,7 +42,7 @@ impl TerrainRGB {
         println!("▶️  Building tiles");
         for lod in 0..max_lod + 1 {
             let now = Instant::now();
-            build_tile_set(&output_path, &img, lod)?;
+            build_tile_set(output_path, &img, lod)?;
             println!(
                 "    ✔️  Finished tiles for LOD {} in {}ms",
                 lod,
@@ -97,10 +97,10 @@ fn elevation_to_rgb(elevation: f32) -> Rgb<u8> {
     let mut x = (10.0 * elevation) as i64 + 100000 % MAX_X;
 
     let b = (x % 256) as u8;
-    x = x / 256;
+    x /= 256;
 
     let g = (x % 256) as u8;
-    x = x / 256;
+    x /= 256;
 
     let r = (x % 256) as u8;
 

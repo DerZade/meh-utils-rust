@@ -1,6 +1,6 @@
-use std::ops::Add;
 use anyhow::bail;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use std::ops::Add;
 
 use std::path::Path;
 use std::time::Instant;
@@ -34,7 +34,7 @@ impl Sat {
         println!("▶️  Building tiles");
         for lod in 0..max_lod + 1 {
             let now = Instant::now();
-            build_tile_set(&output_path, &combined_sat_image, lod)?;
+            build_tile_set(output_path, &combined_sat_image, lod)?;
             println!(
                 "    ✔️  Finished tiles for LOD {} in {}ms",
                 lod,
@@ -48,7 +48,14 @@ impl Sat {
 
         let now = Instant::now();
         println!("▶️  Creating tile.json");
-        crate::tilejson::write(output_path, max_lod, meta, "Satellite", &Vec::new(), "https://localhost/".to_string().add("{z}/{x}/{y}.png"))?;
+        crate::tilejson::write(
+            output_path,
+            max_lod,
+            meta,
+            "Satellite",
+            &Vec::new(),
+            "https://localhost/".to_string().add("{z}/{x}/{y}.png"),
+        )?;
         println!("✔️  Created tile.json in {}ms", now.elapsed().as_millis());
 
         println!("\n    🎉  Finished in {}ms", start.elapsed().as_millis());
@@ -79,7 +86,7 @@ fn load_combined_sat_image(input_path: &Path) -> anyhow::Result<DynamicImage> {
 
     let (ok_results, err_results): (Vec<_>, Vec<_>) = results.into_iter().partition(Result::is_ok);
 
-    if err_results.len() > 0 {
+    if !err_results.is_empty() {
         let error_string: Vec<_> = err_results
             .into_iter()
             .map(|r| format!("\t{}", r.err().unwrap()))

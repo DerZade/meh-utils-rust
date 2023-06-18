@@ -16,7 +16,7 @@ pub fn calc_max_lod(image: &DynamicImage) -> usize {
 
     let tiles_per_row = (width / TILE_SIZE_IN_PX as f32).ceil();
 
-    return tiles_per_row.log2().ceil() as usize;
+    tiles_per_row.log2().ceil() as usize
 }
 
 pub fn encode_png(
@@ -24,7 +24,7 @@ pub fn encode_png(
     img: &DynamicImage,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let file = File::create(file_path)?;
-    let ref mut buf = BufWriter::new(file);
+    let buf = &mut BufWriter::new(file);
     let encoder = PngEncoder::new(buf);
 
     let dim = img.dimensions();

@@ -1,25 +1,26 @@
-use std::process::exit;
-use clap::{App, app_from_crate, AppSettings};
-use crate::commands::{ClapCommand, PreviewCommand, SatCommand, MvtCommand, TerrainRgbCommand, MvtTestCommand};
+use crate::commands::{
+    ClapCommand, MvtCommand, MvtTestCommand, PreviewCommand, SatCommand, TerrainRgbCommand,
+};
 use crate::metajson::SerdeMetaJsonParser;
-
+use clap::{app_from_crate, App, AppSettings};
+use std::process::exit;
 
 mod commands;
 mod dem;
-mod metajson;
-mod tilejson;
-mod utils;
-mod mvt;
 mod feature;
+mod metajson;
+mod mvt;
 #[cfg(test)]
 mod test;
+mod tilejson;
+mod utils;
 
 fn main() {
     let args: Vec<_> = std::env::args().collect();
 
     if let Err(e) = execute(&args) {
         println!("❌ Error: {}", e);
-        println!("❌ Backtrace: {:?}", e.backtrace());
+        //println!("❌ Backtrace: {:?}", e.backtrace());
         exit(1);
     }
 }
@@ -46,7 +47,7 @@ fn execute(input: &[String]) -> anyhow::Result<()> {
     let matches = app.get_matches_from(input);
 
     let result = match matches.subcommand() {
-        Some((name, sub_matches)) => match commands.iter().filter(|c| {c.get_identifier() == name}).next() {
+        Some((name, sub_matches)) => match commands.iter().find(|c| c.get_identifier() == name) {
             Some(command) => command.exec(sub_matches),
             _ => unreachable!(),
         },

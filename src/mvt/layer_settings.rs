@@ -1,33 +1,48 @@
+use crate::mvt::FeatureCollection;
+use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::{BufReader};
-use std::path::{PathBuf};
-use serde::Deserialize;
-use crate::mvt::FeatureCollection;
+use std::io::BufReader;
+use std::path::PathBuf;
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-    use std::path::Path;
-    use geo::Coordinate;
     use crate::feature::{Feature, FeatureCollection};
     use crate::mvt::layer_settings::{find_lod_layers, LayerSetting, LayerSettingSource};
-    use rstest::rstest;
     use crate::mvt::LayerSettingsFile;
-
+    use geo::Coordinate;
+    use rstest::rstest;
+    use std::collections::HashMap;
+    use std::path::Path;
 
     struct DummyLayerSettings {
-        pub settings: Vec<LayerSetting>
+        pub settings: Vec<LayerSetting>,
     }
     impl DummyLayerSettings {
         pub fn new() -> DummyLayerSettings {
             DummyLayerSettings {
                 settings: vec![
-                    LayerSetting { layer: "always".to_string(), minzoom: None, maxzoom: None},
-                    LayerSetting { layer: "lte_lod1".to_string(), minzoom: None, maxzoom: Some(1)},
-                    LayerSetting { layer: "lod3".to_string(), minzoom: Some(3), maxzoom: Some(3)},
-                    LayerSetting { layer: "gte_lod3".to_string(), minzoom: Some(3), maxzoom: None},
-                ]
+                    LayerSetting {
+                        layer: "always".to_string(),
+                        minzoom: None,
+                        maxzoom: None,
+                    },
+                    LayerSetting {
+                        layer: "lte_lod1".to_string(),
+                        minzoom: None,
+                        maxzoom: Some(1),
+                    },
+                    LayerSetting {
+                        layer: "lod3".to_string(),
+                        minzoom: Some(3),
+                        maxzoom: Some(3),
+                    },
+                    LayerSetting {
+                        layer: "gte_lod3".to_string(),
+                        minzoom: Some(3),
+                        maxzoom: None,
+                    },
+                ],
             }
         }
     }
@@ -39,7 +54,7 @@ mod tests {
 
     fn some_feature() -> Feature {
         Feature {
-            geometry: geo::Geometry::Point(geo::Point(Coordinate {x: 1.0, y: 1.0})),
+            geometry: geo::Geometry::Point(geo::Point(Coordinate { x: 1.0, y: 1.0 })),
             properties: HashMap::new(),
         }
     }
@@ -60,12 +75,20 @@ mod tests {
     #[case(2, vec!["always"])]
     #[case(3, vec!["always", "gte_lod3", "lod3"])]
     #[case(4, vec!["always", "gte_lod3"])]
-    fn find_lod_layers_uses_default_layer_settings(#[case] lod: usize, #[case] visible_layers: Vec<&str>) {
+    fn find_lod_layers_uses_default_layer_settings(
+        #[case] lod: usize,
+        #[case] visible_layers: Vec<&str>,
+    ) {
         let layers = vec!["lte_lod1", "always", "gte_lod3", "lod3", "never"];
-        let mut visible_layers_string: Vec<String> = visible_layers.clone().into_iter().map(|s| {s.to_string()}).collect();
+        let mut visible_layers_string: Vec<String> = visible_layers
+            .clone()
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect();
         let collections = collections_with_layers(layers);
 
-        let mut lod_layers: Vec<String> = find_lod_layers(&collections, lod, &DummyLayerSettings::new()).unwrap();
+        let mut lod_layers: Vec<String> =
+            find_lod_layers(&collections, lod, &DummyLayerSettings::new()).unwrap();
 
         visible_layers_string.sort();
         lod_layers.sort();
@@ -75,7 +98,10 @@ mod tests {
 
     #[test]
     fn layer_settings_file_reads_file() {
-        let layer_settings_res = LayerSettingsFile::from_path(Path::new("./resources/default_layer_settings.json").to_path_buf()).get_layer_settings();
+        let layer_settings_res = LayerSettingsFile::from_path(
+            Path::new("./resources/default_layer_settings.json").to_path_buf(),
+        )
+        .get_layer_settings();
 
         assert!(layer_settings_res.is_ok());
 
@@ -83,19 +109,41 @@ mod tests {
 
         assert_eq!(layer_settings.len(), 56);
         let first = layer_settings.first().unwrap();
-        assert_eq!(*first, LayerSetting {layer: "debug".to_string(), minzoom: Some(6), maxzoom: None});
+        assert_eq!(
+            *first,
+            LayerSetting {
+                layer: "debug".to_string(),
+                minzoom: Some(6),
+                maxzoom: None
+            }
+        );
         let last = layer_settings.last().unwrap();
-        assert_eq!(*last, LayerSetting {layer: "contours/100".to_string(), minzoom: Some(0), maxzoom: Some(2)})
+        assert_eq!(
+            *last,
+            LayerSetting {
+                layer: "contours/100".to_string(),
+                minzoom: Some(0),
+                maxzoom: Some(2)
+            }
+        )
     }
 
     #[test]
     fn layer_settings_file_errors_if_file_not_found() {
-        assert!(LayerSettingsFile::from_path(Path::new("./resources/i_dont_exist.json").to_path_buf()).get_layer_settings().is_err());
+        assert!(LayerSettingsFile::from_path(
+            Path::new("./resources/i_dont_exist.json").to_path_buf()
+        )
+        .get_layer_settings()
+        .is_err());
     }
 
     #[test]
     fn layer_settings_file_errors_if_file_not_json() {
-        assert!(LayerSettingsFile::from_path(Path::new("./resources/test/happy/output/.keep").to_path_buf()).get_layer_settings().is_err());
+        assert!(LayerSettingsFile::from_path(
+            Path::new("./resources/test/happy/output/.keep").to_path_buf()
+        )
+        .get_layer_settings()
+        .is_err());
     }
 }
 
@@ -111,14 +159,12 @@ pub trait LayerSettingSource {
 }
 
 pub struct LayerSettingsFile {
-    path: PathBuf
+    path: PathBuf,
 }
 
 impl LayerSettingsFile {
     pub fn from_path(path: PathBuf) -> LayerSettingsFile {
-        LayerSettingsFile {
-            path
-        }
+        LayerSettingsFile { path }
     }
 }
 
@@ -127,9 +173,7 @@ impl LayerSettingSource for LayerSettingsFile {
         let file = File::open(&self.path)?;
         let reader = BufReader::new(file);
 
-        serde_json::from_reader(reader).map_err(|e| {
-            anyhow::Error::new(Box::new(e))
-        })
+        serde_json::from_reader(reader).map_err(|e| anyhow::Error::new(Box::new(e)))
     }
 }
 
@@ -148,12 +192,19 @@ impl LayerSettingSource for LayerSettingsFile {
 ///
 /// return layer names
 ///
-pub fn find_lod_layers(all_layers: &HashMap<String, FeatureCollection>, lod: usize, layer_setting_source: &dyn LayerSettingSource) -> anyhow::Result<Vec<String>> {
+pub fn find_lod_layers(
+    all_layers: &HashMap<String, FeatureCollection>,
+    lod: usize,
+    layer_setting_source: &dyn LayerSettingSource,
+) -> anyhow::Result<Vec<String>> {
     let x: Vec<LayerSetting> = layer_setting_source.get_layer_settings()?;
-    Ok(all_layers.keys().map(|s| {s.clone()}).filter(|k| {
-
-        x.iter().find(|s| {
-            s.layer == *k && s.minzoom.unwrap_or(0) <= lod && s.maxzoom.unwrap_or(255) >= lod
-        }).is_some()
-    }).collect::<Vec<String>>())
+    Ok(all_layers
+        .keys()
+        .cloned()
+        .filter(|k| {
+            x.iter().any(|s| {
+                s.layer == *k && s.minzoom.unwrap_or(0) <= lod && s.maxzoom.unwrap_or(255) >= lod
+            })
+        })
+        .collect::<Vec<String>>())
 }

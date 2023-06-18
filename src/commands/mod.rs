@@ -1,20 +1,18 @@
 mod mvt;
 mod preview;
-mod terrain_rgb;
 mod sat;
+mod terrain_rgb;
 
-use std::path::{Path, PathBuf};
-use anyhow::{bail, Error, Result};
-use clap::{App, arg, ArgMatches};
-use geo::{Coordinate};
-use mapbox_vector_tile::Layer;
 use crate::commands::mvt::MapboxVectorTiles;
 use crate::commands::preview::Preview;
 use crate::commands::sat::Sat;
 use crate::commands::terrain_rgb::TerrainRGB;
 use crate::SerdeMetaJsonParser;
-
-
+use anyhow::{bail, Error, Result};
+use clap::{arg, App, ArgMatches};
+use geo::Coordinate;
+use mapbox_vector_tile::Layer;
+use std::path::{Path, PathBuf};
 
 pub trait ClapCommand {
     fn get_identifier(&self) -> &str;
@@ -23,8 +21,7 @@ pub trait ClapCommand {
 }
 
 pub fn register_input_output_path_parameters(app: App) -> App {
-    app
-        .arg(arg!(-i --input <INPUT_DIR> "Path to grad_meh map directory"))
+    app.arg(arg!(-i --input <INPUT_DIR> "Path to grad_meh map directory"))
         .arg(arg!(-o --output <OUTPUT_DIR> "Path to output directory"))
 }
 
@@ -32,7 +29,10 @@ pub fn get_input_output_path_parameters(matches: &ArgMatches) -> Result<(PathBuf
     let input_path_str = matches.value_of("input").unwrap();
     let output_path_str = matches.value_of("output").unwrap();
 
-    let (input_path, output_path) = (Path::new(input_path_str).to_path_buf(), Path::new(output_path_str).to_path_buf());
+    let (input_path, output_path) = (
+        Path::new(input_path_str).to_path_buf(),
+        Path::new(output_path_str).to_path_buf(),
+    );
 
     if !output_path.is_dir() {
         bail!("Output path is not a directory");
@@ -51,7 +51,8 @@ impl ClapCommand for SatCommand {
         "sat"
     }
     fn register(&self) -> App {
-        let app = App::new(self.get_identifier()).about("Build satellite tiles from grad_meh data.");
+        let app =
+            App::new(self.get_identifier()).about("Build satellite tiles from grad_meh data.");
         register_input_output_path_parameters(app)
     }
 
@@ -67,7 +68,8 @@ impl ClapCommand for MvtCommand {
     }
 
     fn register(&self) -> App {
-        let app = App::new(self.get_identifier()).about("Build mapbox vector tiles from grad_meh data.");
+        let app =
+            App::new(self.get_identifier()).about("Build mapbox vector tiles from grad_meh data.");
         register_input_output_path_parameters(app)
     }
 
@@ -91,13 +93,25 @@ impl ClapCommand for MvtTestCommand {
     fn exec(&self, _: &ArgMatches) -> Result<()> {
         let mut tile = mapbox_vector_tile::Tile::new();
         tile.add_layer("foo_layer");
-        tile.add_feature("foo_layer", mapbox_vector_tile::Feature::from(geo::Geometry::Point(geo::Point(Coordinate { x: 1, y: 1}))));
-        tile.add_feature("foo_layer", mapbox_vector_tile::Feature::from(geo::Geometry::Polygon(geo::Polygon::new(geo::LineString(vec![
-            Coordinate {x: 0, y: 0},
-            Coordinate {x: 0, y: 2},
-            Coordinate {x: 2, y: 2},
-            Coordinate {x: 2, y: 0},
-        ]), vec![]))));
+        tile.add_feature(
+            "foo_layer",
+            mapbox_vector_tile::Feature::from(geo::Geometry::Point(geo::Point(Coordinate {
+                x: 1,
+                y: 1,
+            }))),
+        );
+        tile.add_feature(
+            "foo_layer",
+            mapbox_vector_tile::Feature::from(geo::Geometry::Polygon(geo::Polygon::new(
+                geo::LineString(vec![
+                    Coordinate { x: 0, y: 0 },
+                    Coordinate { x: 0, y: 2 },
+                    Coordinate { x: 2, y: 2 },
+                    Coordinate { x: 2, y: 0 },
+                ]),
+                vec![],
+            ))),
+        );
         tile.add_layer(Layer::new("bar"));
         tile.write_to_file("./foo.bar");
 
@@ -128,7 +142,8 @@ impl ClapCommand for TerrainRgbCommand {
     }
 
     fn register(&self) -> App {
-        let app = App::new(self.get_identifier()).about("Build Terrain-RGB tiles from grad_meh data.");
+        let app =
+            App::new(self.get_identifier()).about("Build Terrain-RGB tiles from grad_meh data.");
         register_input_output_path_parameters(app)
     }
 
@@ -141,10 +156,12 @@ impl ClapCommand for TerrainRgbCommand {
 #[cfg(test)]
 #[allow(unused_must_use)]
 mod tests {
-    use std::path::PathBuf;
-    use clap::{App, ArgMatches};
-    use crate::commands::{get_input_output_path_parameters, register_input_output_path_parameters};
+    use crate::commands::{
+        get_input_output_path_parameters, register_input_output_path_parameters,
+    };
     use crate::test::with_input_and_output_paths;
+    use clap::{App, ArgMatches};
+    use std::path::PathBuf;
 
     fn clap_command_with_params(args: Vec<String>) -> anyhow::Result<(PathBuf, PathBuf)> {
         let app = register_input_output_path_parameters(App::new("x"));
@@ -156,25 +173,23 @@ mod tests {
     #[test]
     fn clap_command_will_bail_on_input_path_not_existing() {
         with_input_and_output_paths(|input_path, _| {
-            let input_path_str = match input_path.to_str() {Some(s) => s, None => ""}.to_string();
+            let input_path_str = input_path.to_str().unwrap_or("").to_string();
             let res = clap_command_with_params(vec![
                 "/foo/pars".to_string(),
                 "--input".to_string(),
                 input_path_str,
                 "--output".to_string(),
-                "/bar/baz".to_string()
+                "/bar/baz".to_string(),
             ]);
 
             assert!(res.is_err());
-
-            ()
         });
     }
 
     #[test]
     fn clap_command_will_bail_on_output_path_not_existing() {
         with_input_and_output_paths(|_, output_path| {
-            let output_path_str = match output_path.to_str() {Some(s) => s, None => ""}.to_string();
+            let output_path_str = output_path.to_str().unwrap_or("").to_string();
             let res = clap_command_with_params(vec![
                 "/foo/pars".to_string(),
                 "--input".to_string(),
@@ -184,8 +199,6 @@ mod tests {
             ]);
 
             assert!(res.is_err());
-
-            ()
         });
     }
 }

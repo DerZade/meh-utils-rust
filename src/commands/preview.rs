@@ -11,12 +11,12 @@ use std::time::Instant;
 #[cfg(test)]
 #[allow(unused_must_use)]
 mod tests {
-    use std::fs;
-    use std::fs::{File};
-    use std::io::Write;
-    use std::path::{Path};
     use crate::commands::preview::Preview;
     use crate::test::with_input_and_output_paths;
+    use std::fs;
+    use std::fs::File;
+    use std::io::Write;
+    use std::path::Path;
 
     #[test]
     fn exec_bails_if_input_preview_file_does_not_exist() {
@@ -37,26 +37,27 @@ mod tests {
     #[test]
     fn exec_runs_if_prerequisites_are_met() {
         with_input_and_output_paths(|input_path, output_path| {
-            assert!(fs::copy(Path::new("./resources/test/happy/input/preview.png"), input_path.join("preview.png")).is_ok());
+            assert!(fs::copy(
+                Path::new("./resources/test/happy/input/preview.png"),
+                input_path.join("preview.png")
+            )
+            .is_ok());
 
             assert!((Preview {}).exec(&input_path, &output_path).is_ok());
-
 
             let mut preview_files: Vec<String> = output_path
                 .read_dir()
                 .unwrap()
-                .map(|r| {r.unwrap().file_name().to_str().unwrap_or("").to_owned()})
-                .filter(|filename| { filename.starts_with("preview_") })
+                .map(|r| r.unwrap().file_name().to_str().unwrap_or("").to_owned())
+                .filter(|filename| filename.starts_with("preview_"))
                 .collect();
 
             fn to_num(e: &str) -> i32 {
-                let digits: String = e.chars().filter(|c| { c.is_digit(10) }).collect();
+                let digits: String = e.chars().filter(|c| c.is_ascii_digit()).collect();
                 digits.parse::<i32>().unwrap()
             }
 
-            preview_files.sort_by(|a, b| {
-                to_num(a).cmp(&to_num(b))
-            });
+            preview_files.sort_by_key(|a| to_num(a));
 
             assert_eq!(4, preview_files.len());
             assert_eq!("preview_128.png", preview_files[0]);

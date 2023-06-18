@@ -1,18 +1,18 @@
 use serde::Serialize;
 
-use std::{collections::HashMap, fs::File, path::Path};
+use crate::metajson::MetaJSON;
 use serde_json::to_string_pretty;
 use std::io::{Error, Write};
-use crate::metajson::MetaJSON;
+use std::{collections::HashMap, fs::File, path::Path};
 
 #[cfg(test)]
 mod tests {
-    use std::fs::{read_to_string};
-    use std::num::NonZeroUsize;
-    use std::ops::Add;
     use crate::metajson::MetaJSON;
     use crate::test::with_input_and_output_paths;
     use crate::tilejson::write;
+    use std::fs::read_to_string;
+    use std::num::NonZeroUsize;
+    use std::ops::Add;
 
     #[test]
     #[allow(unused_must_use)]
@@ -37,7 +37,7 @@ mod tests {
                 },
                 "type_display_name",
                 &Vec::new(),
-                "https://localhost:3000/".to_string().add("{z}/{x}/{y}.png")
+                "https://localhost:3000/".to_string().add("{z}/{x}/{y}.png"),
             );
 
             assert!(res.is_ok());
@@ -73,7 +73,7 @@ pub struct TileJSON {
     pub minzoom: usize,
     pub maxzoom: usize,
     pub vector_layers: Option<Vec<TileJSONLayer>>,
-    pub tiles: Vec<String>
+    pub tiles: Vec<String>,
 }
 
 pub fn write(
@@ -81,16 +81,16 @@ pub fn write(
     max_lod: usize,
     meta: MetaJSON,
     type_display_name: &str,
-    vector_layer_names: &Vec<String>,
+    vector_layer_names: &[String],
     tile_uri: String,
 ) -> Result<(), Error> {
     let vector_layers: Vec<_> = vector_layer_names
         .iter()
         .map(|name| -> TileJSONLayer {
-            return TileJSONLayer {
+            TileJSONLayer {
                 id: name.clone(),
                 fields: layer_fields(name),
-            };
+            }
         })
         .collect();
 
@@ -103,9 +103,9 @@ pub fn write(
         ),
         scheme: String::from("xyz"),
         minzoom: 0,
-        maxzoom: max_lod.into(),
+        maxzoom: max_lod,
         vector_layers: Some(vector_layers),
-        tiles: vec![tile_uri]
+        tiles: vec![tile_uri],
     };
 
     let mut file = File::create(dir.join("tile.json"))?;
@@ -187,5 +187,5 @@ fn layer_fields(layer_name: &String) -> HashMap<String, String> {
         .collect();
     }
 
-    return HashMap::new();
+    HashMap::new()
 }

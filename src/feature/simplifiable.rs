@@ -1,15 +1,15 @@
-use geo::{GeoFloat, Geometry, GeometryCollection};
-use geo::euclidean_length::EuclideanLength;
-use geo::area::Area;
-use geo::simplify::Simplify;
-use crate::feature::{FeatureCollection};
+use crate::feature::FeatureCollection;
 use crate::mvt::MvtGeoFloatType;
+use geo::area::Area;
+use geo::euclidean_length::EuclideanLength;
+use geo::simplify::Simplify;
+use geo::{GeoFloat, Geometry, GeometryCollection};
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-    use geo::{Coordinate, Geometry, Point};
     use crate::feature::{Feature, FeatureCollection, Simplifiable};
+    use geo::{Coordinate, Geometry, Point};
+    use std::collections::HashMap;
 
     #[test]
     fn remove_empty_keeps_points() {
@@ -54,8 +54,8 @@ mod tests {
         let mut collection = FeatureCollection::new();
         let feature = Feature {
             geometry: Geometry::LineString(geo::LineString(vec![
-                Coordinate {x: 1.1, y: 1.1},
-                Coordinate {x: 1.2, y: 1.1},
+                Coordinate { x: 1.1, y: 1.1 },
+                Coordinate { x: 1.2, y: 1.1 },
             ])),
             properties: HashMap::new(),
         };
@@ -71,8 +71,8 @@ mod tests {
         let mut collection = FeatureCollection::new();
         let feature = Feature {
             geometry: Geometry::LineString(geo::LineString(vec![
-                Coordinate {x: 1.1, y: 1.1},
-                Coordinate {x: 1.4, y: 1.1},
+                Coordinate { x: 1.1, y: 1.1 },
+                Coordinate { x: 1.4, y: 1.1 },
             ])),
             properties: HashMap::new(),
         };
@@ -89,12 +89,12 @@ mod tests {
         let feature = Feature {
             geometry: Geometry::Polygon(geo::Polygon::new(
                 geo::LineString(vec![
-                    Coordinate {x: 0.0, y: 1.0},
-                    Coordinate {x: 1.0, y: 1.0},
-                    Coordinate {x: 1.0, y: 0.0},
-                    Coordinate {x: 0.0, y: 0.0},
+                    Coordinate { x: 0.0, y: 1.0 },
+                    Coordinate { x: 1.0, y: 1.0 },
+                    Coordinate { x: 1.0, y: 0.0 },
+                    Coordinate { x: 0.0, y: 0.0 },
                 ]),
-                vec![]
+                vec![],
             )),
             properties: HashMap::new(),
         };
@@ -112,12 +112,18 @@ mod tests {
 
 pub trait Simplifiable<T> {
     /// using https://de.wikipedia.org/wiki/Douglas-Peucker-Algorithmus
-    fn simplify(&mut self, epsilon: T) -> ();
-    fn remove_empty(&mut self, line_limit: T, area_limit: T) -> ();
+    fn simplify(&mut self, epsilon: T);
+    fn remove_empty(&mut self, line_limit: T, area_limit: T);
 }
 
-fn simplify_geo_collection<T: GeoFloat>(collection: &GeometryCollection<T>, epsilon: &T) -> GeometryCollection<T> {
-    return collection.iter().filter_map(|geo| simplify_geo(geo, epsilon)).collect()
+fn simplify_geo_collection<T: GeoFloat>(
+    collection: &GeometryCollection<T>,
+    epsilon: &T,
+) -> GeometryCollection<T> {
+    return collection
+        .iter()
+        .filter_map(|geo| simplify_geo(geo, epsilon))
+        .collect();
 }
 
 fn simplify_geo<T: GeoFloat>(geometry: &Geometry<T>, epsilon: &T) -> Option<geo::Geometry<T>> {
@@ -126,8 +132,10 @@ fn simplify_geo<T: GeoFloat>(geometry: &Geometry<T>, epsilon: &T) -> Option<geo:
         Geometry::Polygon(g) => Some(geo::Geometry::Polygon(g.simplify(epsilon))),
         Geometry::MultiLineString(g) => Some(geo::Geometry::MultiLineString(g.simplify(epsilon))),
         Geometry::MultiPolygon(g) => Some(geo::Geometry::MultiPolygon(g.simplify(epsilon))),
-        Geometry::GeometryCollection(g) => Some(geo::Geometry::GeometryCollection(simplify_geo_collection(&g, epsilon))),
-        _ => None
+        Geometry::GeometryCollection(g) => Some(geo::Geometry::GeometryCollection(
+            simplify_geo_collection(g, epsilon),
+        )),
+        _ => None,
     }
 }
 
@@ -136,8 +144,8 @@ impl Simplifiable<MvtGeoFloatType> for FeatureCollection {
         self.0.iter_mut().for_each(|f| {
             let opt = simplify_geo(&f.geometry, &epsilon);
 
-            if opt.is_some() {
-                f.geometry = opt.unwrap();
+            if let Some(geo) = opt {
+                f.geometry = geo;
             }
         });
     }
@@ -153,7 +161,7 @@ impl Simplifiable<MvtGeoFloatType> for FeatureCollection {
     ///
     /// here the Go implementation, see https://github.com/paulmach/orb/blob/master/encoding/mvt/simplify.go
     ///
-    fn remove_empty(&mut self, line_limit: MvtGeoFloatType, area_limit: MvtGeoFloatType) -> () {
+    fn remove_empty(&mut self, line_limit: MvtGeoFloatType, area_limit: MvtGeoFloatType) {
         for i in (0..self.len()).rev() {
             let f = self.get(i).unwrap();
             let keep = match &f.geometry {
